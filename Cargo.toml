@@ -120,7 +120,3 @@ codegen-units = 4
 
 [profile.ci.package."*"]
 opt-level = 0
-
-# Try fix for stdlib.h and oniguruma <https://github.com/rust-onig/rust-onig/issues/195>
-[patch.crates-io]
-onig = { git = "https://github.com/rust-onig/rust-onig" }
