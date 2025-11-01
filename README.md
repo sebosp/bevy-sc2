@@ -1,4 +1,11 @@
-# My Bevy App
+# Bevy Starcraft 2 Map viewer.
 
-This project was generated using the [Bevy New 2D](https://github.com/TheBevyFlock/bevy_new_2d) template.
-Check out the [documentation](https://github.com/TheBevyFlock/bevy_new_2d/blob/main/README.md) to get started!
+Porting https://github.com/jnmaloney/sc2-map-analyzer to rust for Bevy.
+
+## Status
+
+MapInfo xxd init
+
+![MapInfo xxd](https://github.com/sebosp/bevy-sc2/blob/main/assets/images/s2ma_xxd.png)
+
+Starting to parse the MapInfo and t3HeightMap sectors.
