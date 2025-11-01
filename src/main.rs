@@ -1,102 +1,70 @@
-// Support configuring Bevy lints within code.
-#![cfg_attr(bevy_lint, feature(register_tool), register_tool(bevy))]
-// Disable console on Windows for non-dev builds.
-#![cfg_attr(not(feature = "dev"), windows_subsystem = "windows")]
+use crate::map_info::MapInfo;
+use bevy::log::tracing;
+use bevy::prelude::*;
 
-mod asset_tracking;
-mod audio;
-mod demo;
-#[cfg(feature = "dev")]
-mod dev_tools;
-mod menus;
-mod screens;
-mod theme;
+use bevy_sc2_map::*;
+pub struct MapPlugin;
 
-use bevy::{asset::AssetMetaCheck, prelude::*};
-
-fn main() -> AppExit {
-    App::new().add_plugins(AppPlugin).run()
-}
-
-pub struct AppPlugin;
-
-impl Plugin for AppPlugin {
+impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        // Add Bevy plugins.
-        app.add_plugins(
-            DefaultPlugins
-                .set(AssetPlugin {
-                    // Wasm builds will check for meta files (that don't exist) if this isn't set.
-                    // This causes errors and even panics on web build on itch.
-                    // See https://github.com/bevyengine/bevy_github_ci_template/issues/48.
-                    meta_check: AssetMetaCheck::Never,
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Window {
-                        title: "My Bevy App".to_string(),
-                        fit_canvas_to_parent: true,
-                        ..default()
-                    }
-                    .into(),
-                    ..default()
-                }),
-        );
-
-        // Add other plugins.
-        app.add_plugins((
-            asset_tracking::plugin,
-            audio::plugin,
-            demo::plugin,
-            #[cfg(feature = "dev")]
-            dev_tools::plugin,
-            menus::plugin,
-            screens::plugin,
-            theme::plugin,
-        ));
-
-        // Order new `AppSystems` variants by adding them here:
-        app.configure_sets(
-            Update,
-            (
-                AppSystems::TickTimers,
-                AppSystems::RecordInput,
-                AppSystems::Update,
-            )
-                .chain(),
-        );
-
-        // Set up the `Pause` state.
-        app.init_state::<Pause>();
-        app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
-
-        // Spawn the main camera.
-        app.add_systems(Startup, spawn_camera);
+        app.add_systems(Startup, setup);
     }
 }
 
-/// High-level groupings of systems for the app in the `Update` schedule.
-/// When adding a new variant, make sure to order it in the `configure_sets`
-/// call above.
-#[derive(SystemSet, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-enum AppSystems {
-    /// Tick timers.
-    TickTimers,
-    /// Record player input.
-    RecordInput,
-    /// Do everything else (consider splitting this into further variants).
-    Update,
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(MapPlugin)
+        .run();
 }
 
-/// Whether or not the game is paused.
-#[derive(States, Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
-#[states(scoped_entities)]
-struct Pause(pub bool);
-
-/// A system set for systems that shouldn't run while the game is paused.
-#[derive(SystemSet, Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct PausableSystems;
-
-fn spawn_camera(mut commands: Commands) {
-    commands.spawn((Name::new("Camera"), Camera2d));
+/// set up a simple 3D scene
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // One of the files from the downloaded cache_handles, not all the handles will contain the
+    // t3HeightMap or MapInfo, others seem to have just strings as information such as "SC2 Mod"
+    let s2_mpq_cache: &str =
+        "./assets/s2matest/300d0946f3f5bcd955b533e7acac0dd22445339b38a837efcca7ebe2d93badca.s2ma";
+    let cache_contents = nom_mpq::parser::read_file(s2_mpq_cache);
+    // based on sc2-map-analyzer/analyser/read.cpp
+    let (_input, mpq) = nom_mpq::parser::parse(&cache_contents).unwrap();
+    let map_info = MapInfo::from_mpq(s2_mpq_cache, &mpq, &cache_contents).unwrap();
+    tracing::info!("Map Info: {map_info:?}");
+    let t3_height_map = T3HeightMap::from_mpq(s2_mpq_cache, &mpq, &cache_contents).unwrap();
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::new(
+            *Dir3::Y,
+            Vec2::new(t3_height_map.width as f32, t3_height_map.height as f32),
+        ))),
+        MeshMaterial3d(materials.add(Color::linear_rgba(0.88, 0.88, 0.88, 1.))),
+        Transform::from_xyz(0., 0., 0.),
+    ));
+    // circular base
+    commands.spawn((
+        Mesh3d(meshes.add(Circle::new(4.0))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+    ));
+    // cube
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Transform::from_xyz(0.0, 0.5, 0.0),
+    ));
+    // light
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
+    // camera
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(-200., 200., 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
 }
