@@ -3,10 +3,11 @@ name = "bevy-sc2-map"
 authors = ["Seb Ospina <kraige@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
-bevy = { version = "0.17", features = ["wayland", "dynamic_linking"] }
-rand = "0.8"
+bevy = { version = "0.17", features = ["wayland"] }
+rand = "0.9"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
@@ -22,17 +23,8 @@ nom-mpq = "2.0.5"
 s2protocol = "3.4.0"
 thiserror = "2.0.17"
 
-# Your web builds will start failing if you add a dependency that pulls in `getrandom` v0.3+.
-# To fix this, you should tell `getrandom` to use the `wasm_js` backend on Wasm.
-# See: <https://docs.rs/getrandom/0.3.3/getrandom/#webassembly-support>.
-#[target.wasm32-unknown-unknown.dependencies]
-#getrandom = { version = "0.3", features = ["wasm_js"] }
-# In addition to enabling the `wasm_js` feature, you need to include `--cfg 'getrandom_backend="wasm_js"'`
-# in your rustflags for both local and CI/CD web builds, taking into account that rustflags specified in
-# multiple places are NOT combined (see <https://github.com/rust-lang/cargo/issues/5376>).
-# Alternatively, you can opt out of the rustflags check with this patch:
-#[patch.crates-io]
-#getrandom = { git = "https://github.com/benfrankel/getrandom" }
+[target.wasm32-unknown-unknown.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [features]
 # Default to a native dev build.
@@ -128,3 +120,7 @@ codegen-units = 4
 
 [profile.ci.package."*"]
 opt-level = 0
+
+# Try fix for stdlib.h and oniguruma <https://github.com/rust-onig/rust-onig/issues/195>
+[patch.crates-io]
+onig = { git = "https://github.com/rust-onig/rust-onig" }
