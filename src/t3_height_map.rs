@@ -19,7 +19,8 @@ impl T3HeightMap {
         mpq: &MPQ,
         file_contents: &[u8],
     ) -> Result<Self, BevySC2MapError> {
-        let (_, t3_height_sector) = mpq.read_mpq_file_sector("t3HeightMap", false, file_contents)?;
+        let (_, t3_height_sector) =
+            mpq.read_mpq_file_sector("t3HeightMap", false, file_contents)?;
         let (_, t3_height_map) = Self::parse(&t3_height_sector)?;
         Ok(t3_height_map)
     }
@@ -27,7 +28,10 @@ impl T3HeightMap {
     #[tracing::instrument(level = "info", skip(input), fields(input = peek_hex(input)))]
     pub fn parse(input: &[u8]) -> BevySC2MapResult<&[u8], Self> {
         let (tail, _) = dbg_peek_hex(tag(&b"HMAP"[..]), "read file magic, HMAP bytes")(input)?;
-        let (tail, _) = dbg_peek_hex(tag(&[0x65, 0x00, 0x00, 0x00][..]), "read file version, 4 bytes")(tail)?;
+        let (tail, _) = dbg_peek_hex(
+            tag(&[0x65, 0x00, 0x00, 0x00][..]),
+            "read file version, 4 bytes",
+        )(tail)?;
 
         let (tail, width_bytes) =
             dbg_peek_hex(take(4usize), "read map terrain width, 4 bytes")(tail)?;
@@ -39,12 +43,6 @@ impl T3HeightMap {
 
         let (tail, _unknown_bytes) = dbg_peek_hex(take(16usize), "read 16 unknown bytes")(tail)?;
         //tracing::info!("T3HeightMap ------ Next: {}", peek_hex(tail));
-        Ok((
-            tail,
-            Self {
-                width,
-                height,
-            },
-        ))
+        Ok((tail, Self { width, height }))
     }
 }
