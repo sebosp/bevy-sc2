@@ -6,3 +6,6 @@ pub use map_info::*;
 
 pub mod t3_height_map;
 pub use t3_height_map::*;
+
+pub mod coords;
+pub use coords::*;
