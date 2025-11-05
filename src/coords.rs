@@ -45,8 +45,8 @@ use super::map_info::MapInfo;
 /// Unit short (m)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapCoord {
-    x: f32,
-    y: f32,
+    pub x: f32,
+    pub y: f32,
 }
 
 impl MapCoord {
@@ -68,8 +68,8 @@ impl Display for MapCoord {
 /// Unit short (mt)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapTerrainCoord {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl MapTerrainCoord {
@@ -105,15 +105,15 @@ impl Display for MapTerrainCoord {
     }
 }
 
-/// MapCellCoordinates
+/// Map Cell Coordinates
 /// These are the location of buildable cells.
 /// When placing a building the overlay shows the cells.
 /// The origin is `MapCoord{x: 0.5, y: 0.5}`
 /// Unit short (mc)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapCellCoord {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl MapCellCoord {
@@ -148,10 +148,13 @@ impl From<MapCellCoord> for MapCoord {
     }
 }
 
+// TODOO: Unsure this makes sense, maybe we can delete these two structs
+
+/// Playable Terrain Coordinates
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlayableTerrainCoord {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl PlayableTerrainCoord {
@@ -162,8 +165,8 @@ impl PlayableTerrainCoord {
 
     pub fn from_map_terrain(map_info: &MapInfo, map_terrain_coord: MapTerrainCoord) -> Self {
         Self {
-            x: map_terrain_coord.x - map_info.cell_left as i32,
-            y: map_terrain_coord.y - map_info.cell_bottom as i32,
+            x: map_terrain_coord.x - map_info.cell_left,
+            y: map_terrain_coord.y - map_info.cell_bottom,
         }
     }
 }
@@ -178,10 +181,11 @@ impl Display for PlayableTerrainCoord {
     }
 }
 
+/// Playable Cell Coordinates
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlayableCellCoord {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl PlayableCellCoord {

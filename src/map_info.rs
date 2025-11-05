@@ -6,23 +6,29 @@ use nom_mpq::parser::peek_hex;
 use s2protocol::dbg_peek_hex;
 use tracing::instrument;
 
+/// There are 8x8 pixels per terrain unit.
+pub const IMAGE_DIMENSIONS_PER_TERRAIN_UNIT: i32 = 8;
+
+/// There are 6x6 pixels per terrain unit.
+pub const IMAGE_DIMENSIONS_PER_CELL_UNIT: i32 = 6;
+
 /// The MapInfo coordinates's purpose is to translate "cell"coordinates to "terrain" coordinates,
 /// Showing the playable terrain.
 /// The width and height defined in the MapInfo determine the width and height of the
 /// coords::MapCellCoord.
 #[derive(Default, Debug, Clone)]
 pub struct MapInfo {
-    pub file_version: u32,
-    pub cell_width: u32,
-    pub cell_height: u32,
+    pub file_version: i32,
+    pub cell_width: i32,
+    pub cell_height: i32,
     // Maybe a mode, light Dark/Light?
     pub third_string: String,
     // Some name, "Zerus" in the test case
     pub fourth_string: String,
-    pub cell_left: u32,
-    pub cell_bottom: u32,
-    pub cell_right: u32,
-    pub cell_top: u32,
+    pub cell_left: i32,
+    pub cell_bottom: i32,
+    pub cell_right: i32,
+    pub cell_top: i32,
 }
 
 impl MapInfo {
@@ -43,7 +49,7 @@ impl MapInfo {
 
         let (mut tail, file_version_bytes) =
             dbg_peek_hex(take(4usize), "read file_version, 4 bytes")(tail)?;
-        let (_, file_version) = u32(nom::number::Endianness::Little)(file_version_bytes)?;
+        let (_, file_version) = i32(nom::number::Endianness::Little)(file_version_bytes)?;
         if file_version > 24 {
             // If file_version is more than 24 it seems to need 8 more bytes to read
             let (extra_tail, _) =
@@ -52,11 +58,11 @@ impl MapInfo {
         }
         let (tail, cell_width_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_width, 4 bytes")(tail)?;
-        let (_, cell_width) = u32(nom::number::Endianness::Little)(cell_width_bytes)?;
+        let (_, cell_width) = i32(nom::number::Endianness::Little)(cell_width_bytes)?;
 
         let (tail, cell_height_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_height, 4 bytes")(tail)?;
-        let (_, cell_height) = u32(nom::number::Endianness::Little)(cell_height_bytes)?;
+        let (_, cell_height) = i32(nom::number::Endianness::Little)(cell_height_bytes)?;
 
         if cell_width > 256 || cell_height > 256 {
             tracing::warn!(
@@ -107,19 +113,19 @@ impl MapInfo {
 
         let (tail, cell_left_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_left, 4 bytes")(tail)?;
-        let (_, cell_left) = u32(nom::number::Endianness::Little)(cell_left_bytes)?;
+        let (_, cell_left) = i32(nom::number::Endianness::Little)(cell_left_bytes)?;
 
         let (tail, cell_bottom_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_bottom, 4 bytes")(tail)?;
-        let (_, cell_bottom) = u32(nom::number::Endianness::Little)(cell_bottom_bytes)?;
+        let (_, cell_bottom) = i32(nom::number::Endianness::Little)(cell_bottom_bytes)?;
 
         let (tail, cell_right_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_right, 4 bytes")(tail)?;
-        let (_, cell_right) = u32(nom::number::Endianness::Little)(cell_right_bytes)?;
+        let (_, cell_right) = i32(nom::number::Endianness::Little)(cell_right_bytes)?;
 
         let (tail, cell_top_bytes) =
             dbg_peek_hex(take(4usize), "read map cell_top, 4 bytes")(tail)?;
-        let (_, cell_top) = u32(nom::number::Endianness::Little)(cell_top_bytes)?;
+        let (_, cell_top) = i32(nom::number::Endianness::Little)(cell_top_bytes)?;
 
         if cell_left >= cell_right {
             return Err(BevySC2MapError::InvalidCoordinateBounds(
@@ -170,6 +176,53 @@ impl MapInfo {
                 cell_top,
             },
         ))
+    }
+
+    /// Returns the cell dimensions of the map.
+    pub fn cell_dim_map(&self) -> MapCellCoord {
+        // Previously cxDimMap, cyDimMap
+        MapCellCoord::new(self.cell_width, self.cell_height)
+    }
+
+    /// Returns the dimensions of the map in terrain units.
+    pub fn terrain_dim_map(&self) -> MapTerrainCoord {
+        // Previously txDimMap, tyDimMap
+        MapTerrainCoord::new(self.cell_width + 1, self.cell_height + 1)
+    }
+
+    pub fn cell_dim_playable(&self) -> MapCellCoord {
+        // Previously cxDimPlayable, cyDimPlayable
+        MapCellCoord::new(
+            self.cell_right - self.cell_left,
+            self.cell_top - self.cell_bottom,
+        )
+    }
+
+    /// Returns the playable dimensions of the map in terrain units.
+    pub fn terrain_dim_playable(&self) -> MapTerrainCoord {
+        // Previously txDimPlayable, tyDimPlayable
+        let cell_dim_playable = self.cell_dim_playable();
+        MapTerrainCoord::new(cell_dim_playable.x + 1, cell_dim_playable.y + 1)
+    }
+
+    pub fn cell_left_bottom(&self) -> MapCellCoord {
+        // Previously cLeftBottom
+        MapCellCoord::new(self.cell_left, self.cell_bottom)
+    }
+
+    pub fn cell_right_top(&self) -> MapCellCoord {
+        // Previously cRightTop
+        MapCellCoord::new(self.cell_right, self.cell_top)
+    }
+
+    pub fn terrain_left_bottom(&self) -> MapTerrainCoord {
+        // Previously tLeftBottom
+        MapTerrainCoord::new(self.cell_left, self.cell_bottom)
+    }
+
+    pub fn terrain_right_top(&self) -> MapTerrainCoord {
+        // Previously tRightTop
+        MapTerrainCoord::new(self.cell_width + 1, self.cell_height + 1)
     }
 }
 

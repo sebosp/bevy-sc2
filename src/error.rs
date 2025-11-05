@@ -27,10 +27,10 @@ pub enum BevySC2MapError {
     Utf8Error(#[from] std::str::Utf8Error),
     /// Conversion to UTF-8 failed, from the `Vec<u8>` "name" fields in the proto fields
     #[error("Expected max 256 for map size, got {0}")]
-    InvalidMapSize(u32),
+    InvalidMapSize(i32),
     // The map coordinates bounds are invalid
     #[error("Expected coordinate {0} to be less than {1}")]
-    InvalidCoordinateBounds(String, u32, String, u32),
+    InvalidCoordinateBounds(String, i32, String, i32),
 }
 
 /// Conversion of errors from byte aligned parser
