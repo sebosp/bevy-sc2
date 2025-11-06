@@ -227,12 +227,12 @@ impl MapInfo {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
-    #[test]
-    fn test_parse_map_info() {
+
+    pub fn map_info_cache_content() -> Vec<u8> {
         // xxd -ps -c 1 < MapInfo|sed 's/^/0x/g;s/$/,/g'|xargs echo -n
-        let cache_contents: Vec<u8> = vec![
+        vec![
             0x49, 0x70, 0x61, 0x4d, // 4 bytes IpaM Magic
             0x27, 0x00, 0x00, 0x00, // 4 bytes file_version, in this case more than 24.
             0xc3, 0x38, 0x01, 0x00, 0x00, 0x00, 0x00,
@@ -272,7 +272,12 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_parse_map_info() {
+        let cache_contents: Vec<u8> = map_info_cache_content();
         let (_, map_info) = MapInfo::parse(&cache_contents).unwrap();
         assert_eq!(map_info.cell_width, 168);
         assert_eq!(map_info.cell_height, 168);

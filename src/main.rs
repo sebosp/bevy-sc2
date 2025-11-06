@@ -33,7 +33,8 @@ fn setup(
     let (_input, mpq) = nom_mpq::parser::parse(&cache_contents).unwrap();
     let map_info = MapInfo::from_mpq(s2_mpq_cache, &mpq, &cache_contents).unwrap();
     tracing::info!("Map Info: {map_info:?}");
-    let t3_height_map = T3HeightMap::from_mpq(s2_mpq_cache, &mpq, &cache_contents).unwrap();
+    let t3_height_map =
+        T3HeightMap::from_mpq(s2_mpq_cache, &mpq, &cache_contents, &map_info).unwrap();
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::new(
             *Dir3::Y,
@@ -49,11 +50,15 @@ fn setup(
         Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
     ));
     // cube
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Transform::from_xyz(0.0, 0.5, 0.0),
-    ));
+    for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
+        let x = (idx as i32) % t3_height_map.width;
+        let y = idx as i32 / t3_height_map.width;
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+            Transform::from_xyz(x as f32, y as f32, *cell_height as f32),
+        ));
+    }
     // light
     commands.spawn((
         PointLight {

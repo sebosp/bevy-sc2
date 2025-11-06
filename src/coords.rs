@@ -2,39 +2,39 @@
 //!
 //!
 
-//! Reference doocs from https://github.com/RFEphemeration/sc2-map-analyzer/blob/master/coordinates.hpp
-//!           Some object (see OBJ in playable area),
-//!           is aligned to cells, and its map coordinates
-//!           always end in .5
-//!
-//!                           |                       |
-//!                  #     #  |  #     #     #     #  |  #     #     # <--- mt(width+1, height+1)
-//!                           |                       |
-//!                     @     @     @     @     @     @     @     @ <--- mc(width, height)
-//!                           |                       |
-//!                  #     #  |  #     #     #     #  |  #     #     #
-//!                           |                       |
-//!    boundaries ------@-----@-----@-----@-----@-----@-----@-----@-----
-//!    top and                |                       |                      "%" marks a cell in the
-//!    bottom are    #     #  |  #     #     #     #  |  #     #     #       playable area and
-//!    integers               |      playable area    |                      "@" marks a cell in the
-//!    in the           @     %    OBJ    %     %     @     @     @          unplayable area
-//!    cell frame             |                       |
-//!                  #     #  |  #     #     #     #  |  #     #     #       Note that cells along the
-//!                           |                       |                      bottom and left boundaries
-//!               ------@-----%-----%-----%-----%-----@-----@-----@-----     are playable, but cells
-//!                           |                       |                      along top and right are not
-//!                  #     #  |  #     #     #     #  |  #     #     #
-//!                           |                       |
-//! mc(0, 0) is at ---> @     @     @     @     @     @     @     @ <--.
-//! m(0.5, 0.5)               |                       |                 \
-//!             .--> #     #  |  #     #     #     #  |  #     #     #    Every cell is bordered by
-//!            /              |                       |                   terrain points, so the MapInfo
-//! This is both              |                       |                   width x height of the cell area
-//! the origin               boundaries left and right are                is "surrounded" by a terrain
-//! m(0.0, 0.0) and          integers in the cell frame                   area (width+1) x (height+1)
-//! mt(0, 0)
-//!
+// Reference doocs from https://github.com/RFEphemeration/sc2-map-analyzer/blob/master/coordinates.hpp
+//           Some object (see OBJ in playable area),
+//           is aligned to cells, and its map coordinates
+//           always end in .5
+//
+//                           |                       |
+//                  #     #  |  #     #     #     #  |  #     #     # <--- mt(width+1, height+1)
+//                           |                       |
+//                     @     @     @     @     @     @     @     @ <--- mc(width, height)
+//                           |                       |
+//                  #     #  |  #     #     #     #  |  #     #     #
+//                           |                       |
+//    boundaries ------@-----@-----@-----@-----@-----@-----@-----@-----
+//    top and                |                       |                      "%" marks a cell in the
+//    bottom are    #     #  |  #     #     #     #  |  #     #     #       playable area and
+//    integers               |      playable area    |                      "@" marks a cell in the
+//    in the           @     %    OBJ    %     %     @     @     @          unplayable area
+//    cell frame             |                       |
+//                  #     #  |  #     #     #     #  |  #     #     #       Note that cells along the
+//                           |                       |                      bottom and left boundaries
+//               ------@-----%-----%-----%-----%-----@-----@-----@-----     are playable, but cells
+//                           |                       |                      along top and right are not
+//                  #     #  |  #     #     #     #  |  #     #     #
+//                           |                       |
+// mc(0, 0) is at ---> @     @     @     @     @     @     @     @ <--.
+// m(0.5, 0.5)               |                       |                 \
+//             .--> #     #  |  #     #     #     #  |  #     #     #    Every cell is bordered by
+//            /              |                       |                   terrain points, so the MapInfo
+// This is both              |                       |                   width x height of the cell area
+// the origin               boundaries left and right are                is "surrounded" by a terrain
+// m(0.0, 0.0) and          integers in the cell frame                   area (width+1) x (height+1)
+// mt(0, 0)
+//
 
 use std::fmt::{Display, Formatter};
 
