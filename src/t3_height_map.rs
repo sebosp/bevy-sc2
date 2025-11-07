@@ -70,16 +70,17 @@ impl T3HeightMap {
             );
         }
         let mut data: Vec<u8> = Vec::with_capacity(expected_terrain_data_size);
-
+        let mut tail = tail;
         for _ in 0..(width * height) {
-            let (tail, terrain_unit_bytes) =
+            let (new_tail, terrain_unit_bytes) =
                 dbg_peek_hex(take(6usize), "read 6 bytes of terrain unit data")(tail)?;
             // The 5th byte is the height.
             let height_byte = terrain_unit_bytes[4];
-            if height_byte > 3 {
+            if height_byte > 4 {
                 return Err(BevySC2MapError::T3HeightUnitOutOfBounds(height_byte as i32));
             }
             data.push(height_byte);
+            tail = new_tail;
         }
 
         tracing::info!("T3HeightMap ------ Next: {}", peek_hex(tail));

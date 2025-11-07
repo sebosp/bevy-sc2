@@ -40,7 +40,7 @@ pub enum BevySC2MapError {
     #[error("Expected at least {0} bytes, got {1} bytes")]
     T3HeightNotEnoughBytes(usize, usize),
     /// The height unit is out of bounds.
-    #[error("Height unit out of bounds should be between 1 and 3, but got: {0}")]
+    #[error("Height unit out of bounds should be between 1 and 4, but got: {0}")]
     T3HeightUnitOutOfBounds(i32),
     /// Other error
     #[error("Other Error: {0}")]

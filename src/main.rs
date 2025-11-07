@@ -1,4 +1,5 @@
 use crate::map_info::MapInfo;
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::log::tracing;
 use bevy::prelude::*;
 
@@ -15,6 +16,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(MapPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .run();
 }
 
@@ -37,11 +39,15 @@ fn setup(
         T3HeightMap::from_mpq(s2_mpq_cache, &mpq, &cache_contents, &map_info).unwrap();
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::new(
-            *Dir3::Y,
+            *Dir3::Z,
             Vec2::new(t3_height_map.width as f32, t3_height_map.height as f32),
         ))),
         MeshMaterial3d(materials.add(Color::linear_rgba(0.88, 0.88, 0.88, 1.))),
-        Transform::from_xyz(0., 0., 0.),
+        Transform::from_xyz(
+            -t3_height_map.width as f32 / 2.,
+            -t3_height_map.height as f32 / 2.,
+            0.,
+        ),
     ));
     // circular base
     commands.spawn((
@@ -53,9 +59,20 @@ fn setup(
     for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
         let x = (idx as i32) % t3_height_map.width;
         let y = idx as i32 / t3_height_map.width;
+        let color = if *cell_height == 0 {
+            Color::srgb_u8(124, 144, 255)
+        } else if *cell_height == 1 {
+            Color::srgb_u8(124, 144, 124)
+        } else if *cell_height == 2 {
+            Color::srgb_u8(124, 255, 124)
+        } else if *cell_height == 3 {
+            Color::srgb_u8(124, 255, 255)
+        } else {
+            Color::srgb_u8(255, 125, 125)
+        };
         commands.spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-            MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+            MeshMaterial3d(materials.add(color)),
             Transform::from_xyz(x as f32, y as f32, *cell_height as f32),
         ));
     }
@@ -65,11 +82,11 @@ fn setup(
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_xyz(4.0, 8.0, 4.0),
+        Transform::from_xyz(40.0, 80.0, 40.0),
     ));
     // camera
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(-200., 200., 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(-200., 200., 200.0).looking_at(Vec3::ZERO, Vec3::Z),
     ));
 }
