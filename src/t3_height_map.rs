@@ -16,7 +16,6 @@ pub struct T3HeightMap {
 impl T3HeightMap {
     #[instrument(skip(mpq, file_contents))]
     pub fn from_mpq(
-        file_name: &str,
         mpq: &MPQ,
         file_contents: &[u8],
         map_info: &MapInfo,

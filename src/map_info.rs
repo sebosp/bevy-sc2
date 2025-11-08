@@ -33,11 +33,7 @@ pub struct MapInfo {
 
 impl MapInfo {
     #[instrument(skip(mpq, file_contents))]
-    pub fn from_mpq(
-        file_name: &str,
-        mpq: &MPQ,
-        file_contents: &[u8],
-    ) -> Result<Self, BevySC2MapError> {
+    pub fn from_mpq(mpq: &MPQ, file_contents: &[u8]) -> Result<Self, BevySC2MapError> {
         let (_, map_info_sector) = mpq.read_mpq_file_sector("MapInfo", false, file_contents)?;
         let (_, map_info) = Self::parse(&map_info_sector)?;
         Ok(map_info)
