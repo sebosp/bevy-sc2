@@ -183,9 +183,7 @@ fn send_request(mut ev_request: MessageWriter<TypedRequest<Vec<u8>>>) {
     let s2_mpq_cache: &str =
         "assets/s2matest/300d0946f3f5bcd955b533e7acac0dd22445339b38a837efcca7ebe2d93badca.s2ma";
     if let Ok(request) = HttpClient::new()
-        .get(format!(
-            "https://github.com/sebosp/bevy-sc2/raw/refs/heads/main/{s2_mpq_cache}"
-        ))
+        .get(format!("https://sebosp.github.io/bevy-sc2/{s2_mpq_cache}"))
         .try_with_type::<Vec<u8>>()
     {
         ev_request.write(request);
