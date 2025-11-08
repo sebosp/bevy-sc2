@@ -6,21 +6,21 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = { version = "0.17", features = ["wayland"] }
-rand = "0.9"
+bevy = "0.17"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-# Compile low-severity logs out of web builds for performance.
+s2protocol = { version = "3.4.1", default-features = false, features = [
+    "tracing_off",
+] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
 nom = "8.0.0"
 nom-mpq = "2.0.5"
-s2protocol = "3.4.0"
 thiserror = "2.0.17"
 
 [target.wasm32-unknown-unknown.dependencies]

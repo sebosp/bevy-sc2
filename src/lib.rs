@@ -9,3 +9,6 @@ pub use t3_height_map::*;
 
 pub mod coords;
 pub use coords::*;
+
+pub mod camera_controller;
+pub use camera_controller::*;
