@@ -1,11 +1,11 @@
 use bevy::color::palettes;
-use bevy_sc2_map::*;
 use bevy::prelude::*;
+use bevy_sc2_map::*;
 
 use bevy::log::tracing;
-use bevy::time::common_conditions::{once_after_delay};
-use camera_controller::{CameraController, CameraControllerPlugin};
+use bevy::time::common_conditions::once_after_delay;
 use bevy_http_client::prelude::*;
+use camera_controller::{CameraController, CameraControllerPlugin};
 
 // We can create our own gizmo config group!
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -21,10 +21,7 @@ impl Plugin for MapPlugin {
             Update,
             send_request.run_if(once_after_delay(std::time::Duration::from_secs(1))),
         );
-        app.add_systems(Update, (
-                        handle_binary_response,
-                        handle_error)
-        );
+        app.add_systems(Update, (handle_binary_response, handle_error));
     }
 }
 
@@ -176,12 +173,9 @@ fn send_request(mut ev_request: MessageWriter<HttpRequest>) {
         .get(format!("https://sebosp.github.io/bevy-sc2/{s2_mpq_cache}"))
         .try_build()
     {
-        ev_request.write(
-            request
-        );
+        ev_request.write(request);
     }
 }
-
 
 /// consume TypedResponse<IpInfo> events
 fn handle_binary_response(
@@ -195,14 +189,14 @@ fn handle_binary_response(
         tracing::info!("response: {:?}", response);
         let cache_contents = &response.bytes;
         // based on sc2-map-analyzer/analyser/read.cpp
-        let (_input, mpq) = nom_mpq::parser::parse(&cache_contents).unwrap();
-        let map_info = MapInfo::from_mpq(&mpq, &cache_contents).unwrap();
+        let (_input, mpq) = nom_mpq::parser::parse(cache_contents).unwrap();
+        let map_info = MapInfo::from_mpq(&mpq, cache_contents).unwrap();
         tracing::info!("Map Info: {map_info:?}");
-        let t3_height_map = T3HeightMap::from_mpq(&mpq, &cache_contents, &map_info).unwrap();
+        let t3_height_map = T3HeightMap::from_mpq(&mpq, cache_contents, &map_info).unwrap();
         let map_size = t3_height_map.width.max(t3_height_map.height) as f32 * 0.1;
         commands.spawn((
             Camera3d::default(),
-            Transform::from_xyz(map_size*2., map_size * 1.5, map_size)
+            Transform::from_xyz(map_size * 2., map_size * 1.5, map_size)
                 .looking_at(Vec3::new(map_size / 2., 0.0, map_size / 2.), Vec3::Y),
             CameraController::default(),
         ));
@@ -259,7 +253,6 @@ fn handle_binary_response(
         }
     }
 }
-
 
 fn handle_error(mut ev_error: MessageReader<HttpResponseError>) {
     for error in ev_error.read() {
