@@ -392,21 +392,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-sc2-map"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_http_client",
- "getrandom 0.3.4",
- "log",
- "nom 8.0.0",
- "nom-mpq",
- "s2protocol",
- "thiserror 2.0.17",
- "tracing",
-]
-
-[[package]]
 name = "bevy_a11y"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5224,6 +5209,22 @@ name = "svg_fmt"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0193cc4331cfd2f3d2011ef287590868599a2f33c3e69bc22c1a3d3acf9e02fb"
+
+[[package]]
+name = "swarmy-bevy"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_http_client",
+ "clap",
+ "getrandom 0.3.4",
+ "log",
+ "nom 8.0.0",
+ "nom-mpq",
+ "s2protocol",
+ "thiserror 2.0.17",
+ "tracing",
+]
 
 [[package]]
 name = "swash"

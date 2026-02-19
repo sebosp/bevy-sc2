@@ -1,6 +1,7 @@
 use bevy::color::palettes;
 use bevy::prelude::*;
-use bevy_sc2_map::*;
+use clap::Parser;
+use swarmy_bevy::*;
 
 use bevy::log::tracing;
 use bevy::time::common_conditions::once_after_delay;
@@ -25,7 +26,19 @@ impl Plugin for MapPlugin {
     }
 }
 
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Name of the person to greet
+    #[arg(short, long)]
+    fname: String,
+}
+
 fn main() {
+    let args = Args::parse();
+    // store the name in a resource so we can access it in our systems
+
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(HttpClientPlugin)
@@ -170,7 +183,9 @@ fn send_request(mut ev_request: MessageWriter<HttpRequest>) {
     let s2_mpq_cache: &str =
         "assets/s2matest/300d0946f3f5bcd955b533e7acac0dd22445339b38a837efcca7ebe2d93badca.s2ma";
     if let Ok(request) = HttpClient::new()
-        .get(format!("https://sebosp.github.io/bevy-sc2/{s2_mpq_cache}"))
+        .get(format!(
+            "https://sebosp.github.io/swarmy-bevy/{s2_mpq_cache}"
+        ))
         .try_build()
     {
         ev_request.write(request);

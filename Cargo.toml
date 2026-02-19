@@ -1,5 +1,5 @@
 [package]
-name = "bevy-sc2-map"
+name = "swarmy-bevy"
 authors = ["Seb Ospina <kraige@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
@@ -23,6 +23,7 @@ nom = "8.0.0"
 nom-mpq = "2.0"
 thiserror = "2.0.17"
 bevy_http_client = "0.10"
+clap = { version = "4.5", features = ["derive"] }
 
 [target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
