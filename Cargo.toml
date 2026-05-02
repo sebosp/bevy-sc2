@@ -6,13 +6,13 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = "0.18"
+bevy = { version = "0.18.1", features = ["free_camera"] }
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-s2protocol = { version = "3.5.1", default-features = false, features = [
+s2protocol = { version = "3.5.3", default-features = false, features = [
     "tracing_off",
 ] }
 tracing = { version = "0.1", features = [
@@ -22,7 +22,6 @@ tracing = { version = "0.1", features = [
 nom = "8.0.0"
 nom-mpq = "2.0"
 thiserror = "2.0.17"
-bevy_http_client = "0.10"
 clap = { version = "4.5", features = ["derive"] }
 
 [target.wasm32-unknown-unknown.dependencies]
