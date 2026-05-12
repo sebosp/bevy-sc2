@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::prelude::*;
+
 use bevy::color::palettes;
 use bevy::prelude::*;
 use clap::Parser;
@@ -5,6 +8,9 @@ use swarmy_bevy::*;
 
 use bevy::camera_controller::free_camera::{FreeCamera, FreeCameraPlugin};
 use bevy::log::tracing;
+use tracing::instrument;
+
+pub const MAP_SCALE_FACTOR: f32 = 10.;
 
 // We can create our own gizmo config group!
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -25,7 +31,7 @@ impl Plugin for MapPlugin {
 pub struct SnapshotPath(String);
 
 #[derive(Default, Resource, Reflect)]
-pub struct CacheHandleId(String);
+pub struct CacheHandleIds(String);
 
 /// Parse cli args.
 #[derive(Parser, Debug)]
@@ -34,20 +40,22 @@ struct Args {
     /// The path of the snapshot, a user should have already clicked on download caches.
     #[arg(short, long)]
     snapshot_path: String,
-    /// The ID of the cache handle. Unique per map version.
+    /// A comma-separated list of caches to inspect for the map data.
+    /// When a replay is loaded it contains multiple ids for different purposes.
+    /// I assume there's only one t3HeightMap and only one MapInfo sector.
     #[arg(short, long)]
-    cache_handle_id: String,
+    cache_handle_ids: String,
 }
 
 fn main() {
     let args = Args::parse();
     let snapshot_path = args.snapshot_path;
-    let cache_handle_id = args.cache_handle_id;
+    let cache_handle_id = args.cache_handle_ids;
     // store the name in a resource so we can access it in our systems
 
     App::new()
         .insert_resource(SnapshotPath(snapshot_path))
-        .insert_resource(CacheHandleId(cache_handle_id))
+        .insert_resource(CacheHandleIds(cache_handle_id))
         .init_gizmo_group::<MyRoundGizmos>()
         .add_plugins(DefaultPlugins)
         .add_plugins(FreeCameraPlugin)
@@ -81,22 +89,64 @@ fn setup(mut commands: Commands) {
     ));
 }
 
+/// Attempts to read the s2ma file.
+#[instrument]
+pub fn read_mpq_file(path: &str) -> Result<Vec<u8>, BevySC2MapError> {
+    tracing::info!("Opening file.");
+    let mut f = File::open(path)?;
+    tracing::info!("Reading into buffer.");
+    let mut buffer: Vec<u8> = vec![];
+    // read the whole file
+    f.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+#[instrument]
+fn try_get_t3_height_map_from_mpq(
+    cache_handle_fname: &str,
+) -> Result<T3HeightMap, BevySC2MapError> {
+    tracing::info!("Starting...");
+    let cache_contents = read_mpq_file(&cache_handle_fname)?;
+    // based on sc2-map-analyzer/analyser/read.cpp
+    tracing::info!("MPQ file read, parsing...");
+    let (_input, mpq) = nom_mpq::parser::parse(&cache_contents)?;
+    tracing::info!("Reading MapInfo from mpq...");
+    let map_info = MapInfo::from_mpq(&mpq, &cache_contents)?;
+    tracing::info!("Map Info: {map_info:?}");
+    let t3_height_map = T3HeightMap::from_mpq(&mpq, &cache_contents, &map_info)?;
+    Ok(t3_height_map)
+}
+
 /// set up a simple 3D scene
 fn load_t3_height_map(
     mut commands: Commands,
     snapshot_path: Res<SnapshotPath>,
-    cache_handle_id: Res<CacheHandleId>,
+    cache_handle_ids: Res<CacheHandleIds>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    tracing::info!("Handle response");
-    let cache_handle_fname = format!("{}/{}.s2ma", snapshot_path.0, cache_handle_id.0);
-    let cache_contents = nom_mpq::parser::read_file(&cache_handle_fname);
-    // based on sc2-map-analyzer/analyser/read.cpp
-    let (_input, mpq) = nom_mpq::parser::parse(&cache_contents).unwrap();
-    let map_info = MapInfo::from_mpq(&mpq, &cache_contents).unwrap();
-    tracing::info!("Map Info: {map_info:?}");
-    let t3_height_map = T3HeightMap::from_mpq(&mpq, &cache_contents, &map_info).unwrap();
+    let mut t3_height_map: Option<T3HeightMap> = None;
+    info!("Got input: {}", cache_handle_ids.0);
+    for cache_handle_id in cache_handle_ids.0.split(",") {
+        if cache_handle_id.is_empty() {
+            continue;
+        }
+        let cache_handle_fname = format!("{}/{}.s2ma", snapshot_path.0, cache_handle_id);
+        info!("Checking cache_handle_fname: {}", cache_handle_fname);
+        if let Ok(val) = try_get_t3_height_map_from_mpq(&cache_handle_fname) {
+            t3_height_map = Some(val);
+        }
+    }
+    let t3_height_map = match t3_height_map {
+        Some(val) => {
+            debug!("Found t3_height_map.");
+            val
+        }
+        None => panic!(
+            "Unable to find cache handles from input: {}",
+            cache_handle_ids.0
+        ),
+    };
     let map_size = t3_height_map.width.max(t3_height_map.height) as f32 * 0.1;
     commands.spawn((
         Camera3d::default(),
