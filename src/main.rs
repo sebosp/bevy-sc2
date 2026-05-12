@@ -143,8 +143,8 @@ fn load_t3_height_map(
             val
         }
         None => panic!(
-            "Unable to find cache handles from input: {}",
-            cache_handle_ids.0
+            "Unable to find cache handles from input: {} {}",
+            snapshot_path.0, cache_handle_ids.0
         ),
     };
     let map_size = t3_height_map.width.max(t3_height_map.height) as f32 * 0.1;
