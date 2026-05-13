@@ -2,8 +2,9 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use bevy::color::palettes;
-use bevy::color::palettes::css::{GREEN, RED};
+use bevy::color::palettes::css::{GOLD, GREEN, RED};
 use bevy::prelude::*;
+use chrono::DateTime;
 use clap::Parser;
 use swarmy_bevy::*;
 
@@ -37,6 +38,7 @@ pub struct CliParams {
     map_title: String,
     snapshot_path: String,
     cache_handle_ids: String,
+    document_header: DocumentHeader,
 }
 
 /// Parse cli args.
@@ -61,11 +63,13 @@ fn main() {
     let args = Args::parse();
     // store the name in a resource so we can access it in our systems
 
+    let snapshot_path = args.snapshot_path.trim_end_matches('/').to_string();
     App::new()
         .insert_resource(CliParams {
             map_title: args.map_title,
-            snapshot_path: args.snapshot_path,
+            snapshot_path,
             cache_handle_ids: args.cache_handle_ids,
+            document_header: DocumentHeader::default(),
         })
         .init_gizmo_group::<MyRoundGizmos>()
         .add_plugins(DefaultPlugins)
@@ -89,8 +93,8 @@ fn setup(mut commands: Commands) {
         Text::new(
             "Controls:\n\
             W/A/S/D to move (Shift for speed)\n\
-            Mouse drag\n\
-            Mouse scroll for move speed",
+            Mouse drag (scroll for speed)\n\
+            B for AABB",
         ),
         Node {
             position_type: PositionType::Absolute,
@@ -121,29 +125,22 @@ pub fn read_mpq_file(path: &str) -> Result<Vec<u8>, BevySC2MapError> {
 fn try_get_t3_height_map_from_mpq(
     map_title: &str,
     cache_handle_fname: &str,
-) -> Result<(MapInfo, T3HeightMap), BevySC2MapError> {
-    tracing::info!("Starting...");
+) -> Result<(MapInfo, T3HeightMap, Option<DocumentHeader>), BevySC2MapError> {
+    let mut document_header: Option<DocumentHeader> = None;
     let cache_contents = read_mpq_file(&cache_handle_fname)?;
     // based on sc2-map-analyzer/analyser/read.cpp
-    tracing::info!("MPQ file read, parsing...");
     let (_input, mpq) = nom_mpq::parser::parse(&cache_contents)?;
-    for file in mpq.get_files(&cache_contents)? {
-        let (_, file_sector) = mpq.read_mpq_file_sector(&file.0, false, &cache_contents)?;
-        let content = String::from_utf8_lossy(&file_sector).to_string();
-
-        if content.contains(map_title) {
-            tracing::warn!(
-                "Found map title in file cache handle id {} in file {} ",
-                cache_handle_fname,
-                file.0
-            );
+    for (file, _file_size) in mpq.get_files(&cache_contents)? {
+        if file == "DocumentHeader" {
+            if let Ok(docu_header) = DocumentHeader::from_mpq(&mpq, &cache_contents) {
+                document_header = Some(docu_header);
+            }
         }
     }
-    tracing::info!("Reading MapInfo from mpq...");
     let map_info = MapInfo::from_mpq(&mpq, &cache_contents)?;
     tracing::info!("Map Info: {map_info:?}");
     let t3_height_map = T3HeightMap::from_mpq(&mpq, &cache_contents, &map_info)?;
-    Ok((map_info, t3_height_map))
+    Ok((map_info, t3_height_map, document_header))
 }
 
 /// set up a simple 3D scene
@@ -155,17 +152,19 @@ fn load_t3_height_map(
 ) {
     let mut t3_height_map: Option<T3HeightMap> = None;
     let mut map_info: Option<MapInfo> = None;
+    let mut document_header: Option<DocumentHeader> = None;
     for cache_handle_id in cli_params.cache_handle_ids.split(",") {
         if cache_handle_id.is_empty() {
             continue;
         }
         let cache_handle_fname = format!("{}/{}.s2ma", cli_params.snapshot_path, cache_handle_id);
         info!("Checking cache_handle_fname: {}", cache_handle_fname);
-        if let Ok((map, height)) =
+        if let Ok((map, height, docu_header)) =
             try_get_t3_height_map_from_mpq(&cli_params.map_title, &cache_handle_fname)
         {
             map_info = Some(map);
             t3_height_map = Some(height);
+            document_header = docu_header;
         }
     }
     let map_size = if let Some(ref val) = t3_height_map {
@@ -251,7 +250,7 @@ fn load_t3_height_map(
             dim_playable.x,
             dim_playable.y,
             t3_height_map.width,
-            t3_height_map.width
+            t3_height_map.height
         )),
         Node {
             position_type: PositionType::Absolute,
@@ -266,6 +265,43 @@ fn load_t3_height_map(
             ..default()
         },
     ));
+    tracing::info!("docu header: {:?}", document_header);
+    if let Some(docu_header) = document_header {
+        let maybe_dt_1 = match DateTime::from_timestamp_secs(docu_header.some_epoch_1 as i64) {
+            Some(val) => val.to_string(),
+            None => docu_header.some_epoch_1.to_string(),
+        };
+        let maybe_dt_2 = match DateTime::from_timestamp_secs(docu_header.some_epoch_2 as i64) {
+            Some(val) => val.to_string(),
+            None => docu_header.some_epoch_2.to_string(),
+        };
+
+        // Print DocumentHeader
+        commands.spawn((
+            Text::new(format!(
+                "{} - {}\n\
+                    {}\n\
+                    Map Dates: {} - {}",
+                docu_header.name,
+                docu_header.mod_info,
+                docu_header.description_long,
+                maybe_dt_1,
+                maybe_dt_2
+            )),
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: px(12),
+                left: px(12),
+                ..default()
+            },
+            TextColor(Color::from(GOLD)),
+            TextLayout::new_with_justify(Justify::Right),
+            TextFont {
+                font_size: 14.,
+                ..default()
+            },
+        ));
+    }
 
     // Cuboids for the cells.
     for (idx, cell_height) in t3_height_map.data.iter().enumerate() {

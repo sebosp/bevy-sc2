@@ -6,6 +6,7 @@
 //!
 
 use super::*;
+use bevy::reflect::Reflect;
 use nom::bytes::complete::*;
 use nom::number::complete::*;
 use nom_mpq::MPQ;
@@ -13,12 +14,12 @@ use nom_mpq::parser::peek_hex;
 use s2protocol::dbg_peek_hex;
 use tracing::instrument;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Reflect)]
 pub struct DocumentHeader {
     pub maybe_dimension_x1: i32,
     pub maybe_dimension_y1: i32,
-    pub maybe_dimension_x2: i32,
-    pub maybe_dimension_y2: i32,
+    pub some_epoch_1: i32,
+    pub some_epoch_2: i32,
     pub mod_info: String,
     // Aka the map title.
     pub name: String,
@@ -42,7 +43,20 @@ impl DocumentHeader {
             "MapInfo/Player00/Name"
             | "MapInfo/Player01/Name"
             | "MapInfo/Player02/Name"
-            | "MapInfo/Player03/Name" => tracing::debug!("Ignoring {name}"),
+            | "MapInfo/Player03/Name"
+            // These values are seen on Heart Of The Swarm it seems, may be related to GameHeart.
+            // Thus far the information I am looking for appears in the Legacy of the Void and the
+            // structs are easy to parse, I hope I don't have to try to understand the Swarm one,
+            // seems more complex:
+            | "DocInfo/Screenshot01"
+            | "DocInfo/Screenshot02"
+            | "DocInfo/Screenshot03"
+            | "DocInfo/HowToPlayBasic00"
+            | "DocInfo/HowToPlayBasic01"
+            | "DocInfo/HowToPlayBasic02"
+            | "DocInfo/HowToPlayAdvanced00"
+            | "DocInfo/HowToPlayAdvanced01"
+            | "DocInfo/HowToPlayAdvanced02" => tracing::debug!("Ignoring {name}"),
             _ => {
                 tracing::warn!("Unknown field name {name}")
             }
@@ -92,13 +106,13 @@ impl DocumentHeader {
 
         let (tail, maybe_i32_bytes) =
             dbg_peek_hex(take(4usize), "read maybe_i32_bytes, 4 bytes")(tail)?;
-        let (_, maybe_dimension_x2) = i32(nom::number::Endianness::Little)(maybe_i32_bytes)?;
-        res.maybe_dimension_x2 = maybe_dimension_x2;
+        let (_, some_epoch_1) = i32(nom::number::Endianness::Little)(maybe_i32_bytes)?;
+        res.some_epoch_1 = some_epoch_1;
 
         let (tail, maybe_i32_bytes) =
             dbg_peek_hex(take(4usize), "read maybe_i32_bytes, 4 bytes")(tail)?;
-        let (_, maybe_dimension_y2) = i32(nom::number::Endianness::Little)(maybe_i32_bytes)?;
-        res.maybe_dimension_y2 = maybe_dimension_y2;
+        let (_, some_epoch_2) = i32(nom::number::Endianness::Little)(maybe_i32_bytes)?;
+        res.some_epoch_2 = some_epoch_2;
 
         // 0200 0000 0000 0000 0100 0000 follows, no idea what these are...
         let (tail, _padding_bytes) = dbg_peek_hex(
@@ -108,7 +122,14 @@ impl DocumentHeader {
 
         let (tail, string_bytes) = dbg_peek_hex(take_while(|x| x != 0u8), "read mod string")(tail)?;
         res.mod_info = String::from_utf8_lossy(string_bytes).to_string();
+        if res.mod_info != "bnet:Void (Mod)/0.0/999,file:Mods/Void.SC2Mod" {
+            return Err(BevySC2MapError::Other(
+                "Only parsed Void typed.".to_string(),
+            ));
+        }
+
         tracing::info!("Got mod_info: {}", res.mod_info);
+
         let (tail, _past_the_zero_delim) = dbg_peek_hex(
             take(1usize),
             "read _past_the_zero_delim on mod_info, 1 bytes",

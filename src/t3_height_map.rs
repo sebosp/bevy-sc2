@@ -82,7 +82,6 @@ impl T3HeightMap {
             tail = new_tail;
         }
 
-        tracing::info!("T3HeightMap ------ Next: {}", peek_hex(tail));
         Ok((
             tail,
             Self {
