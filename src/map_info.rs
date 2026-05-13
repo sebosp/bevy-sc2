@@ -1,3 +1,6 @@
+//! Parsing the MapInfo file.
+//! TODO: should move this to maybe s2protocol-rs for reuse
+
 use super::*;
 use nom::bytes::complete::*;
 use nom::number::complete::*;
@@ -232,7 +235,7 @@ impl MapInfo {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub mod map_info_tests {
     use super::*;
 
     pub fn map_info_cache_content() -> Vec<u8> {

@@ -4,6 +4,9 @@ pub use error::*;
 pub mod map_info;
 pub use map_info::*;
 
+pub mod document_header;
+pub use document_header::*;
+
 pub mod t3_height_map;
 pub use t3_height_map::*;
 
@@ -12,4 +15,3 @@ pub use coords::*;
 
 pub mod camera_controller;
 pub use camera_controller::*;
-

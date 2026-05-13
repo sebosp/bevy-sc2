@@ -28,16 +28,25 @@ impl Plugin for MapPlugin {
     }
 }
 
+/// Show some text if there's a current action
 #[derive(Default, Resource, Reflect)]
-pub struct SnapshotPath(String);
+pub struct ActivityStage(String);
 
 #[derive(Default, Resource, Reflect)]
-pub struct CacheHandleIds(String);
+pub struct CliParams {
+    map_title: String,
+    snapshot_path: String,
+    cache_handle_ids: String,
+}
 
 /// Parse cli args.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// The name of the map.
+    #[arg(short, long)]
+    map_title: String,
+
     /// The path of the snapshot, a user should have already clicked on download caches.
     #[arg(short, long)]
     snapshot_path: String,
@@ -50,13 +59,14 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let snapshot_path = args.snapshot_path;
-    let cache_handle_id = args.cache_handle_ids;
     // store the name in a resource so we can access it in our systems
 
     App::new()
-        .insert_resource(SnapshotPath(snapshot_path))
-        .insert_resource(CacheHandleIds(cache_handle_id))
+        .insert_resource(CliParams {
+            map_title: args.map_title,
+            snapshot_path: args.snapshot_path,
+            cache_handle_ids: args.cache_handle_ids,
+        })
         .init_gizmo_group::<MyRoundGizmos>()
         .add_plugins(DefaultPlugins)
         .add_plugins(FreeCameraPlugin)
@@ -109,6 +119,7 @@ pub fn read_mpq_file(path: &str) -> Result<Vec<u8>, BevySC2MapError> {
 
 #[instrument]
 fn try_get_t3_height_map_from_mpq(
+    map_title: &str,
     cache_handle_fname: &str,
 ) -> Result<(MapInfo, T3HeightMap), BevySC2MapError> {
     tracing::info!("Starting...");
@@ -117,7 +128,16 @@ fn try_get_t3_height_map_from_mpq(
     tracing::info!("MPQ file read, parsing...");
     let (_input, mpq) = nom_mpq::parser::parse(&cache_contents)?;
     for file in mpq.get_files(&cache_contents)? {
-        tracing::info!("--- {:?}", file);
+        let (_, file_sector) = mpq.read_mpq_file_sector(&file.0, false, &cache_contents)?;
+        let content = String::from_utf8_lossy(&file_sector).to_string();
+
+        if content.contains(map_title) {
+            tracing::warn!(
+                "Found map title in file cache handle id {} in file {} ",
+                cache_handle_fname,
+                file.0
+            );
+        }
     }
     tracing::info!("Reading MapInfo from mpq...");
     let map_info = MapInfo::from_mpq(&mpq, &cache_contents)?;
@@ -129,49 +149,109 @@ fn try_get_t3_height_map_from_mpq(
 /// set up a simple 3D scene
 fn load_t3_height_map(
     mut commands: Commands,
-    snapshot_path: Res<SnapshotPath>,
-    cache_handle_ids: Res<CacheHandleIds>,
+    cli_params: Res<CliParams>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut t3_height_map: Option<T3HeightMap> = None;
     let mut map_info: Option<MapInfo> = None;
-    info!("Got input: {}", cache_handle_ids.0);
-    for cache_handle_id in cache_handle_ids.0.split(",") {
+    for cache_handle_id in cli_params.cache_handle_ids.split(",") {
         if cache_handle_id.is_empty() {
             continue;
         }
-        let cache_handle_fname = format!("{}/{}.s2ma", snapshot_path.0, cache_handle_id);
+        let cache_handle_fname = format!("{}/{}.s2ma", cli_params.snapshot_path, cache_handle_id);
         info!("Checking cache_handle_fname: {}", cache_handle_fname);
-        if let Ok((map, height)) = try_get_t3_height_map_from_mpq(&cache_handle_fname) {
+        if let Ok((map, height)) =
+            try_get_t3_height_map_from_mpq(&cli_params.map_title, &cache_handle_fname)
+        {
             map_info = Some(map);
             t3_height_map = Some(height);
         }
     }
+    let map_size = if let Some(ref val) = t3_height_map {
+        val.width.max(val.height) as f32 * 0.1
+    } else {
+        1.
+    };
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(map_size * 1., map_size * 0.75, map_size)
+            .looking_at(Vec3::new(map_size / 2., 0.0, map_size / 2.), Vec3::Y),
+        FreeCamera::default(),
+    ));
+    // light
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
     let map_info = if let Some(val) = map_info {
         val
     } else {
         commands.spawn((
             Text::new(format!(
-                "Unable to find MapInfo input: {} on directory {}",
-                snapshot_path.0, cache_handle_ids.0
+                "Unable to find MapInfo embedded\n\
+                in any of cache handles in directory\n\
+                {}\n\
+                Trigger Cache downloading by clicking on\n\
+                Download Caches button in swarmy app -> Scan tab.",
+                cli_params.snapshot_path
             )),
             Node {
                 position_type: PositionType::Absolute,
-                top: px(12),
-                left: px(500),
+                top: px(200),
+                left: px(200),
                 ..default()
             },
             TextColor(Color::from(RED)),
-            TextLayout::new_with_justify(Justify::Center),
+            TextLayout::new_with_justify(Justify::Right),
         ));
         return;
     };
+
+    let t3_height_map = match t3_height_map {
+        Some(val) => {
+            debug!("Found t3_height_map.");
+            val
+        }
+        None => {
+            error!(
+                "Unable to find t3HeightMap embedded in the cache handles directory: {}",
+                cli_params.snapshot_path,
+            );
+            commands.spawn((
+                Text::new(format!(
+                    "Unable to find cache handles from input: {} {}",
+                    cli_params.snapshot_path, cli_params.cache_handle_ids
+                )),
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: px(12),
+                    left: px(12),
+                    ..default()
+                },
+                TextColor(Color::from(RED)),
+            ));
+            return;
+        }
+    };
+
     let dim_playable = map_info.cell_dim_playable();
     commands.spawn((
         Text::new(format!(
-            "{} - {}\nPlayable Dimensions: {} - {}",
-            map_info.third_string, map_info.fourth_string, dim_playable.x, dim_playable.y,
+            "{}\n\
+                {} - {}\n\
+                MapInfo Dimensions: {} - {}\n\
+                TerrainHeight Dimensions: {} - {}",
+            cli_params.map_title,
+            map_info.third_string,
+            map_info.fourth_string,
+            dim_playable.x,
+            dim_playable.y,
+            t3_height_map.width,
+            t3_height_map.width
         )),
         Node {
             position_type: PositionType::Absolute,
@@ -187,55 +267,6 @@ fn load_t3_height_map(
         },
     ));
 
-    let t3_height_map = match t3_height_map {
-        Some(val) => {
-            debug!("Found t3_height_map.");
-            val
-        }
-        None => {
-            error!(
-                "Unable to find cache handles from input: {} {}",
-                snapshot_path.0, cache_handle_ids.0
-            );
-            commands.spawn((
-                Text::new(format!(
-                    "Unable to find cache handles from input: {} {}",
-                    snapshot_path.0, cache_handle_ids.0
-                )),
-                Node {
-                    position_type: PositionType::Absolute,
-                    top: px(12),
-                    left: px(12),
-                    ..default()
-                },
-                TextColor(Color::from(RED)),
-            ));
-            return;
-        }
-    };
-    let map_size = t3_height_map.width.max(t3_height_map.height) as f32 * 0.1;
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(map_size * 1., map_size * 0.75, map_size)
-            .looking_at(Vec3::new(map_size / 2., 0.0, map_size / 2.), Vec3::Y),
-        FreeCamera::default(),
-    ));
-    // light
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
-    // light
-    commands.spawn((
-        PointLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(8.0, 4.0, 4.0),
-    ));
     // Cuboids for the cells.
     for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
         let x = t3_height_map.width - (idx as i32) % t3_height_map.width;

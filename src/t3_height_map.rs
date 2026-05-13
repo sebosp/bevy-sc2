@@ -97,7 +97,7 @@ impl T3HeightMap {
 #[cfg(test)]
 mod tests {
     use super::map_info::MapInfo;
-    use super::map_info::tests::map_info_cache_content;
+    use super::map_info::map_info_tests::map_info_cache_content;
     use super::*;
     #[test]
     fn test_parse_map_info() {
