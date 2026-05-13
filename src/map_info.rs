@@ -21,9 +21,13 @@ pub struct MapInfo {
     pub file_version: i32,
     pub cell_width: i32,
     pub cell_height: i32,
+    /// Mostly seen empty?
+    pub first_string: String,
+    /// Also empty?
+    pub second_string: String,
     // Maybe a mode, light Dark/Light?
     pub third_string: String,
-    // Some name, "Zerus" in the test case
+    // Some name, "Zerus" in the test case, maybe map maker?
     pub fourth_string: String,
     pub cell_left: i32,
     pub cell_bottom: i32,
@@ -75,14 +79,17 @@ impl MapInfo {
             "padding zeros fill before Strings after cell_height+unknown",
         )(tail)?;
 
-        let (tail, _) = dbg_peek_hex(take_while(|x| x != 0u8), "walk past the first string")(tail)?;
+        let (tail, string_bytes) =
+            dbg_peek_hex(take_while(|x| x != 0u8), "walk past the first string")(tail)?;
+        let first_string = String::from_utf8_lossy(string_bytes).to_string();
         let (tail, _unknown_byte) = dbg_peek_hex(
             take(1usize),
             "advance past termination character first string",
         )(tail)?;
 
-        let (tail, _) =
+        let (tail, string_bytes) =
             dbg_peek_hex(take_while(|x| x != 0u8), "walk past the second string")(tail)?;
+        let second_string = String::from_utf8_lossy(string_bytes).to_string();
         let (tail, _unknown_byte) = dbg_peek_hex(
             take(1usize),
             "advance past termination character second string",
@@ -164,6 +171,8 @@ impl MapInfo {
                 file_version,
                 cell_width,
                 cell_height,
+                first_string,
+                second_string,
                 third_string,
                 fourth_string,
                 cell_left,

@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use bevy::color::palettes;
+use bevy::color::palettes::css::{GREEN, RED};
 use bevy::prelude::*;
 use clap::Parser;
 use swarmy_bevy::*;
@@ -76,14 +77,19 @@ fn setup(mut commands: Commands) {
     // example instructions
     commands.spawn((
         Text::new(
-            "Press 'B' to show all AABB boxes\n\
-            W/A/S/D to move\n\
-            Mouse to change camera orientation",
+            "Controls:\n\
+            W/A/S/D to move (Shift for speed)\n\
+            Mouse drag\n\
+            Mouse scroll for move speed",
         ),
         Node {
             position_type: PositionType::Absolute,
             top: px(12),
             left: px(12),
+            ..default()
+        },
+        TextFont {
+            font_size: 11.,
             ..default()
         },
     ));
@@ -104,17 +110,20 @@ pub fn read_mpq_file(path: &str) -> Result<Vec<u8>, BevySC2MapError> {
 #[instrument]
 fn try_get_t3_height_map_from_mpq(
     cache_handle_fname: &str,
-) -> Result<T3HeightMap, BevySC2MapError> {
+) -> Result<(MapInfo, T3HeightMap), BevySC2MapError> {
     tracing::info!("Starting...");
     let cache_contents = read_mpq_file(&cache_handle_fname)?;
     // based on sc2-map-analyzer/analyser/read.cpp
     tracing::info!("MPQ file read, parsing...");
     let (_input, mpq) = nom_mpq::parser::parse(&cache_contents)?;
+    for file in mpq.get_files(&cache_contents)? {
+        tracing::info!("--- {:?}", file);
+    }
     tracing::info!("Reading MapInfo from mpq...");
     let map_info = MapInfo::from_mpq(&mpq, &cache_contents)?;
     tracing::info!("Map Info: {map_info:?}");
     let t3_height_map = T3HeightMap::from_mpq(&mpq, &cache_contents, &map_info)?;
-    Ok(t3_height_map)
+    Ok((map_info, t3_height_map))
 }
 
 /// set up a simple 3D scene
@@ -126,6 +135,7 @@ fn load_t3_height_map(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut t3_height_map: Option<T3HeightMap> = None;
+    let mut map_info: Option<MapInfo> = None;
     info!("Got input: {}", cache_handle_ids.0);
     for cache_handle_id in cache_handle_ids.0.split(",") {
         if cache_handle_id.is_empty() {
@@ -133,19 +143,75 @@ fn load_t3_height_map(
         }
         let cache_handle_fname = format!("{}/{}.s2ma", snapshot_path.0, cache_handle_id);
         info!("Checking cache_handle_fname: {}", cache_handle_fname);
-        if let Ok(val) = try_get_t3_height_map_from_mpq(&cache_handle_fname) {
-            t3_height_map = Some(val);
+        if let Ok((map, height)) = try_get_t3_height_map_from_mpq(&cache_handle_fname) {
+            map_info = Some(map);
+            t3_height_map = Some(height);
         }
     }
+    let map_info = if let Some(val) = map_info {
+        val
+    } else {
+        commands.spawn((
+            Text::new(format!(
+                "Unable to find MapInfo input: {} on directory {}",
+                snapshot_path.0, cache_handle_ids.0
+            )),
+            Node {
+                position_type: PositionType::Absolute,
+                top: px(12),
+                left: px(500),
+                ..default()
+            },
+            TextColor(Color::from(RED)),
+            TextLayout::new_with_justify(Justify::Center),
+        ));
+        return;
+    };
+    let dim_playable = map_info.cell_dim_playable();
+    commands.spawn((
+        Text::new(format!(
+            "{} - {}\nPlayable Dimensions: {} - {}",
+            map_info.third_string, map_info.fourth_string, dim_playable.x, dim_playable.y,
+        )),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(12),
+            right: px(12),
+            ..default()
+        },
+        TextColor(Color::from(GREEN)),
+        TextLayout::new_with_justify(Justify::Right),
+        TextFont {
+            font_size: 14.,
+            ..default()
+        },
+    ));
+
     let t3_height_map = match t3_height_map {
         Some(val) => {
             debug!("Found t3_height_map.");
             val
         }
-        None => panic!(
-            "Unable to find cache handles from input: {} {}",
-            snapshot_path.0, cache_handle_ids.0
-        ),
+        None => {
+            error!(
+                "Unable to find cache handles from input: {} {}",
+                snapshot_path.0, cache_handle_ids.0
+            );
+            commands.spawn((
+                Text::new(format!(
+                    "Unable to find cache handles from input: {} {}",
+                    snapshot_path.0, cache_handle_ids.0
+                )),
+                Node {
+                    position_type: PositionType::Absolute,
+                    top: px(12),
+                    left: px(12),
+                    ..default()
+                },
+                TextColor(Color::from(RED)),
+            ));
+            return;
+        }
     };
     let map_size = t3_height_map.width.max(t3_height_map.height) as f32 * 0.1;
     commands.spawn((
@@ -161,6 +227,14 @@ fn load_t3_height_map(
             ..default()
         },
         Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
+    // light
+    commands.spawn((
+        PointLight {
+            shadows_enabled: true,
+            ..default()
+        },
+        Transform::from_xyz(8.0, 4.0, 4.0),
     ));
     // Cuboids for the cells.
     for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
