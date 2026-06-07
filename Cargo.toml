@@ -7,17 +7,20 @@ license = "MIT"
 
 [dependencies]
 bevy = { version = "0.18.1", features = ["free_camera"] }
+bevy_skein = "0.5.0-rc.1"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
 s2protocol = { path = "../s2protocol-rs/", default-features = false, features = [
+    "tracing_info_level",
 ] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
+
 nom = "8.0.0"
 nom-mpq = "2.0"
 thiserror = "2.0.17"
@@ -32,7 +35,7 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [features]
 # Default to a native dev build.
-default = ["dev_native"]
+default = ["dev"]
 dev = [
     # Improve compile times for dev builds by linking Bevy as a dynamic library.
     # "bevy/dynamic_linking",

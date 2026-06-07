@@ -1,16 +1,17 @@
-use std::fs::File;
-use std::io::prelude::*;
-
+use bevy::camera_controller::free_camera::{FreeCamera, FreeCameraPlugin};
 use bevy::color::palettes;
 use bevy::color::palettes::css::{GOLD, GREEN, RED};
+use bevy::log::tracing;
 use bevy::prelude::*;
+use bevy::{prelude::*, scene::SceneInstanceReady};
+use bevy_skein::SkeinPlugin;
 use chrono::DateTime;
 use clap::Parser;
-use swarmy_bevy::*;
-
-use bevy::camera_controller::free_camera::{FreeCamera, FreeCameraPlugin};
-use bevy::log::tracing;
+use std::fs::File;
+use std::io::prelude::*;
 use tracing::instrument;
+
+use swarmy_bevy::*;
 
 pub const MAP_SCALE_FACTOR: f32 = 10.;
 
@@ -35,46 +36,55 @@ pub struct ActivityStage(String);
 
 #[derive(Default, Resource, Reflect)]
 pub struct CliParams {
-    map_title: String,
-    snapshot_path: String,
-    cache_handle_ids: String,
-    document_header: DocumentHeader,
+    path: String,
+    ids: String,
 }
 
 /// Parse cli args.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// The name of the map.
+    /// The path where the caches have been downloaded to.
+    /// A user should have already clicked on download caches.
+    /// This is set in the Config section of Swarmy.
     #[arg(short, long)]
-    map_title: String,
-
-    /// The path of the snapshot, a user should have already clicked on download caches.
-    #[arg(short, long)]
-    snapshot_path: String,
+    path: String,
     /// A comma-separated list of caches to inspect for the map data.
     /// When a replay is loaded it contains multiple ids for different purposes.
     /// I assume there's only one t3HeightMap and only one MapInfo sector.
     #[arg(short, long)]
-    cache_handle_ids: String,
+    ids: String,
 }
 
 fn main() {
     let args = Args::parse();
     // store the name in a resource so we can access it in our systems
 
-    let snapshot_path = args.snapshot_path.trim_end_matches('/').to_string();
+    let path = args.path.trim_end_matches('/').to_string();
     App::new()
         .insert_resource(CliParams {
-            map_title: args.map_title,
-            snapshot_path,
-            cache_handle_ids: args.cache_handle_ids,
-            document_header: DocumentHeader::default(),
+            path,
+            ids: args.ids,
         })
         .init_gizmo_group::<MyRoundGizmos>()
         .add_plugins(DefaultPlugins)
+        .add_plugins(SkeinPlugin::default())
         .add_plugins(FreeCameraPlugin)
         .add_plugins(MapPlugin)
+        .add_observer(
+            // log the component from the gltf spawn
+            |ready: On<SceneInstanceReady>,
+             children: Query<&Children>,
+             characters: Query<&Character>| {
+                for entity in children.iter_descendants(ready.entity) {
+                    let Ok(character) = characters.get(entity) else {
+                        continue;
+                    };
+                    info!(?character);
+                }
+            },
+        )
+        .add_systems(Startup, startup)
         .run();
 }
 
@@ -123,18 +133,17 @@ pub fn read_mpq_file(path: &str) -> Result<Vec<u8>, BevySC2MapError> {
 
 #[instrument]
 fn try_get_t3_height_map_from_mpq(
-    map_title: &str,
     cache_handle_fname: &str,
 ) -> Result<(MapInfo, T3HeightMap, Option<DocumentHeader>), BevySC2MapError> {
     let mut document_header: Option<DocumentHeader> = None;
-    let cache_contents = read_mpq_file(&cache_handle_fname)?;
+    let cache_contents = read_mpq_file(cache_handle_fname)?;
     // based on sc2-map-analyzer/analyser/read.cpp
     let (_input, mpq) = nom_mpq::parser::parse(&cache_contents)?;
     for (file, _file_size) in mpq.get_files(&cache_contents)? {
-        if file == "DocumentHeader" {
-            if let Ok(docu_header) = DocumentHeader::from_mpq(&mpq, &cache_contents) {
-                document_header = Some(docu_header);
-            }
+        if file == "DocumentHeader"
+            && let Ok(docu_header) = DocumentHeader::from_mpq(&mpq, &cache_contents)
+        {
+            document_header = Some(docu_header);
         }
     }
     let map_info = MapInfo::from_mpq(&mpq, &cache_contents)?;
@@ -153,15 +162,17 @@ fn load_t3_height_map(
     let mut t3_height_map: Option<T3HeightMap> = None;
     let mut map_info: Option<MapInfo> = None;
     let mut document_header: Option<DocumentHeader> = None;
-    for cache_handle_id in cli_params.cache_handle_ids.split(",") {
+    for cache_handle_id in cli_params.ids.split(",") {
         if cache_handle_id.is_empty() {
             continue;
         }
-        let cache_handle_fname = format!("{}/{}.s2ma", cli_params.snapshot_path, cache_handle_id);
+        let cache_handle_fname = format!("{}/{}.s2ma", cli_params.path, cache_handle_id);
         info!("Checking cache_handle_fname: {}", cache_handle_fname);
-        if let Ok((map, height, docu_header)) =
-            try_get_t3_height_map_from_mpq(&cli_params.map_title, &cache_handle_fname)
+        if let Ok((map, height, docu_header)) = try_get_t3_height_map_from_mpq(&cache_handle_fname)
         {
+            // tracing::info!("t3_height_map: {:?}", height);
+            tracing::info!("map_info: {:?}", map);
+            tracing::info!("document_header: {:?}", document_header);
             map_info = Some(map);
             t3_height_map = Some(height);
             document_header = docu_header;
@@ -196,7 +207,7 @@ fn load_t3_height_map(
                 {}\n\
                 Trigger Cache downloading by clicking on\n\
                 Download Caches button in swarmy app -> Scan tab.",
-                cli_params.snapshot_path
+                cli_params.path
             )),
             Node {
                 position_type: PositionType::Absolute,
@@ -218,12 +229,12 @@ fn load_t3_height_map(
         None => {
             error!(
                 "Unable to find t3HeightMap embedded in the cache handles directory: {}",
-                cli_params.snapshot_path,
+                cli_params.path,
             );
             commands.spawn((
                 Text::new(format!(
                     "Unable to find cache handles from input: {} {}",
-                    cli_params.snapshot_path, cli_params.cache_handle_ids
+                    cli_params.path, cli_params.ids
                 )),
                 Node {
                     position_type: PositionType::Absolute,
@@ -240,11 +251,9 @@ fn load_t3_height_map(
     let dim_playable = map_info.cell_dim_playable();
     commands.spawn((
         Text::new(format!(
-            "{}\n\
-                {} - {}\n\
+            "{} - {}\n\
                 MapInfo Dimensions: {} - {}\n\
                 TerrainHeight Dimensions: {} - {}",
-            cli_params.map_title,
             map_info.third_string,
             map_info.fourth_string,
             dim_playable.x,
@@ -266,7 +275,7 @@ fn load_t3_height_map(
         },
     ));
     tracing::info!("docu header: {:?}", document_header);
-    if let Some(docu_header) = document_header {
+    if let Some(mut docu_header) = document_header {
         let maybe_dt_1 = match DateTime::from_timestamp_secs(docu_header.some_epoch_1 as i64) {
             Some(val) => val.to_string(),
             None => docu_header.some_epoch_1.to_string(),
@@ -275,6 +284,23 @@ fn load_t3_height_map(
             Some(val) => val.to_string(),
             None => docu_header.some_epoch_2.to_string(),
         };
+
+        // Remove double new lines to save space in the UI.
+        let line_len = 80usize;
+        let mut desc_lines: Vec<String> = vec![];
+        docu_header.description_long = docu_header.description_long.replace("<n/><n/>", "<n/>");
+        let chunks = docu_header.description_long.split(" ");
+        let mut curr_str = String::from("");
+        for chunk in chunks {
+            if curr_str.len() < line_len {
+                curr_str.push_str(" ");
+                curr_str.push_str(chunk);
+            } else {
+                desc_lines.push(curr_str.replace("<n/>", "\n"));
+                curr_str = chunk.to_string();
+            }
+        }
+        docu_header.description_long = desc_lines.join("\n");
 
         // Print DocumentHeader
         commands.spawn((
@@ -291,7 +317,7 @@ fn load_t3_height_map(
             Node {
                 position_type: PositionType::Absolute,
                 bottom: px(12),
-                left: px(12),
+                right: px(12),
                 ..default()
             },
             TextColor(Color::from(GOLD)),
@@ -320,11 +346,26 @@ fn load_t3_height_map(
         };
         let color = Color::from(color);
         commands.spawn((
+            TerrainCell {
+                y: y as f32 / 10.,
+                x: 1.,
+                z: x as f32 / 10.,
+            },
             Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
             MeshMaterial3d(materials.add(color)),
-            Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
+            GltfAssetLabel::Scene(0).from_asset("swarmy_bevy.gltf"),
+            //Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
         ));
     }
+}
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+struct TerrainCell {
+    x: f32,
+    y: f32,
+    z: f32,
 }
 
 fn update_config(
@@ -401,4 +442,18 @@ fn update_config(
             virtual_time.pause();
         }
     }
+}
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+struct Character {
+    name: String,
+}
+
+fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.spawn(SceneRoot(asset_server.load(
+        // Change this to your exported gltf file
+        GltfAssetLabel::Scene(0).from_asset("swarmy-objects.gltf"),
+    )));
 }
