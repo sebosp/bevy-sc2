@@ -158,6 +158,7 @@ fn load_t3_height_map(
     cli_params: Res<CliParams>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     let mut t3_height_map: Option<T3HeightMap> = None;
     let mut map_info: Option<MapInfo> = None;
@@ -347,13 +348,16 @@ fn load_t3_height_map(
         let color = Color::from(color);
         commands.spawn((
             TerrainCell {
-                y: y as f32 / 10.,
-                x: 1.,
-                z: x as f32 / 10.,
+                pos_x: y as f32 / 10.,
+                pos_y: 1.,
+                pos_z: x as f32 / 10.,
+                scl_x: 0.1,
+                scl_y: *cell_height as f32,
+                scl_z: 0.1,
             },
-            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
-            MeshMaterial3d(materials.add(color)),
-            GltfAssetLabel::Scene(0).from_asset("swarmy_bevy.gltf"),
+            //Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
+            //MeshMaterial3d(materials.add(color)),
+            SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
             //Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
         ));
     }
@@ -363,9 +367,12 @@ fn load_t3_height_map(
 #[reflect(Component, Default)]
 #[type_path = "api"]
 struct TerrainCell {
-    x: f32,
-    y: f32,
-    z: f32,
+    pos_x: f32,
+    pos_y: f32,
+    pos_z: f32,
+    scl_x: f32,
+    scl_y: f32,
+    scl_z: f32,
 }
 
 fn update_config(
