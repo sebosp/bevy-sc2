@@ -3,10 +3,11 @@ use bevy::color::palettes;
 use bevy::color::palettes::css::{GOLD, GREEN, RED};
 use bevy::log::tracing;
 use bevy::prelude::*;
-use bevy::{prelude::*, scene::SceneInstanceReady};
+use bevy::scene::SceneInstanceReady;
 use bevy_skein::SkeinPlugin;
 use chrono::DateTime;
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::prelude::*;
 use tracing::instrument;
@@ -355,12 +356,91 @@ fn load_t3_height_map(
                 scl_y: *cell_height as f32,
                 scl_z: 0.1,
             },
-            //Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
-            //MeshMaterial3d(materials.add(color)),
-            SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
-            //Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
+            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
+            MeshMaterial3d(materials.add(color)),
+            //SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
+            Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
         ));
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
+
+        if let Ok(files_content) = std::fs::read_to_string(&path) {
+            match serde_xml_rs::from_str::<PlacedObjects>(&files_content) {
+                Ok(val) => {
+                    tracing::info!("{:?}", val);
+                    //val,
+                }
+                Err(err) => {
+                    tracing::error!("Failed to parse XML file {:?}: {}", path, err);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlacedObjects {
+    #[serde(rename = "@Version")]
+    pub version: u32,
+    #[serde(rename = "ObjectPoint", default)]
+    pub points: Vec<ObjectPoint>,
+    #[serde(rename = "ObjectDoodad", default)]
+    pub doodas: Vec<ObjectDoodad>,
+    #[serde(rename = "ObjectUnit", default)]
+    pub units: Vec<ObjectUnit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectDoodad {
+    #[serde(rename = "@Id")]
+    pub id: String,
+    #[serde(default, rename = "@Variation")]
+    pub variation: String,
+    #[serde(rename = "@Position")]
+    pub position: String,
+    #[serde(default, rename = "@Rotation")]
+    pub rotation: String,
+    #[serde(rename = "@Scale")]
+    pub scale: String,
+    #[serde(rename = "@Type")]
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectPoint {
+    #[serde(rename = "@Id")]
+    pub id: String,
+    #[serde(rename = "@Position")]
+    pub position: String,
+    #[serde(rename = "@Scale")]
+    pub scale: String,
+    #[serde(rename = "@Type")]
+    pub kind: String,
+    #[serde(rename = "@Name")]
+    pub name: String,
+    #[serde(rename = "@Color")]
+    pub color: String,
+    #[serde(default, rename = "@PathingRadiusSoft")]
+    pub pathing_radius_soft: u32,
+    #[serde(default, rename = "@PathingRadiusHard")]
+    pub pathing_radius_hard: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectUnit {
+    #[serde(rename = "@Id")]
+    pub id: String,
+    #[serde(default, rename = "@Variation")]
+    pub variation: String,
+    #[serde(rename = "@Position")]
+    pub position: String,
+    #[serde(rename = "@Scale")]
+    pub scale: String,
+    #[serde(rename = "@UnitType")]
+    pub unit_kind: String,
 }
 
 #[derive(Component, Default, Reflect, Debug)]
