@@ -250,7 +250,8 @@ fn load_t3_height_map(
         }
     };
 
-    let dim_playable = map_info.cell_dim_playable();
+    let playable_dimensions = MapDimension::from(map_info.cell_dim_playable());
+    let map_dimension = MapDimension::new(t3_height_map.width as f32, t3_height_map.height as f32);
     commands.spawn((
         Text::new(format!(
             "{} - {}\n\
@@ -258,8 +259,8 @@ fn load_t3_height_map(
                 TerrainHeight Dimensions: {} - {}",
             map_info.third_string,
             map_info.fourth_string,
-            dim_playable.x,
-            dim_playable.y,
+            playable_dimensions.x,
+            playable_dimensions.y,
             t3_height_map.width,
             t3_height_map.height
         )),
@@ -302,6 +303,8 @@ fn load_t3_height_map(
                 curr_str = chunk.to_string();
             }
         }
+
+        desc_lines.push(curr_str.replace("<n/>", "\n"));
         docu_header.description_long = desc_lines.join("\n");
 
         // Print DocumentHeader
@@ -335,48 +338,161 @@ fn load_t3_height_map(
     for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
         let x = t3_height_map.width - (idx as i32) % t3_height_map.width;
         let y = t3_height_map.width - idx as i32 / t3_height_map.width;
-        let color = if *cell_height == 0 {
-            palettes::css::BLACK
-        } else if *cell_height == 1 {
-            palettes::css::LIGHT_BLUE
-        } else if *cell_height == 2 {
-            palettes::css::LIGHT_GOLDENROD_YELLOW
-        } else if *cell_height == 3 {
-            palettes::css::DARK_GREEN
-        } else {
-            palettes::css::DARK_RED
-        };
-        let color = Color::from(color);
+        let (x, y) = (x as f32, y as f32);
+        let cell_color = compute_cell_color(
+            *cell_height,
+            x as f32,
+            y as f32,
+            playable_dimensions,
+            map_dimension,
+        );
         commands.spawn((
             TerrainCell {
-                pos_x: y as f32 / 10.,
+                pos_x: y / 10.,
                 pos_y: 1.,
-                pos_z: x as f32 / 10.,
+                pos_z: x / 10.,
                 scl_x: 0.1,
                 scl_y: *cell_height as f32,
                 scl_z: 0.1,
             },
-            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, *cell_height as f32, 0.1)))),
-            MeshMaterial3d(materials.add(color)),
+            Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+                0.1,
+                *cell_height as f32 * 0.5,
+                0.1,
+            )))),
+            MeshMaterial3d(materials.add(cell_color)),
             //SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
-            Transform::from_xyz(y as f32 / 10., 1., x as f32 / 10.),
+            Transform::from_xyz(y / 10., *cell_height as f32 * 0.25, x / 10.),
         ));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
+    let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
 
-        if let Ok(files_content) = std::fs::read_to_string(&path) {
-            match serde_xml_rs::from_str::<PlacedObjects>(&files_content) {
-                Ok(val) => {
-                    tracing::info!("{:?}", val);
-                    //val,
+    if let Ok(files_content) = std::fs::read_to_string(&path) {
+        match serde_xml_rs::from_str::<PlacedObjects>(&files_content) {
+            Ok(val) => {
+                tracing::info!("{:?}", val);
+                for unit in val.units {
+                    // ObjectUnit { id: "209", variation: "8", position: "97,102.5,0", scale: "1,1,1", unit_kind: "RichMineralField" }
+                    let unit_pos: Vec<f32> = unit
+                        .position
+                        .split(",")
+                        .filter_map(|x| x.parse::<f32>().ok())
+                        .collect();
+                    if unit_pos.len() != 3 {
+                        tracing::error!(
+                            "Unexpected number of tokens for unit position typed: {}",
+                            unit.unit_kind
+                        );
+                        continue;
+                    }
+                    let unit_color: StandardMaterial = match unit.unit_kind.as_ref() {
+                        "RichMineralField750" => {
+                            let mut unit_col =
+                                StandardMaterial::from(Color::from(palettes::tailwind::ORANGE_600));
+                            unit_col.metallic = 1.0;
+                            unit_col
+                        }
+                        "RichMineralField" => {
+                            let mut unit_col =
+                                StandardMaterial::from(Color::from(palettes::tailwind::YELLOW_500));
+                            unit_col.metallic = 1.0;
+                            unit_col
+                        }
+                        "MineralField750" => {
+                            StandardMaterial::from(Color::from(palettes::tailwind::BLUE_600))
+                        }
+                        "MineralField" => {
+                            StandardMaterial::from(Color::from(palettes::tailwind::CYAN_400))
+                        }
+                        "RichVespeneGeyser" => {
+                            StandardMaterial::from(Color::from(palettes::tailwind::GREEN_500))
+                        }
+                        "VespeneGeyser" => {
+                            StandardMaterial::from(Color::from(palettes::tailwind::VIOLET_600))
+                        }
+                        "SpacePlatformGeyser" => {
+                            StandardMaterial::from(Color::from(palettes::tailwind::ROSE_600))
+                        }
+                        _ => StandardMaterial::from(Color::from(palettes::tailwind::NEUTRAL_500)),
+                    };
+                    let (x, y) = playable_dimensions_to_t3_map_dimensions(
+                        (unit_pos[0], unit_pos[1]),
+                        map_dimension,
+                        playable_dimensions,
+                    );
+                    commands.spawn((
+                        Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, 2., 0.1)))),
+                        MeshMaterial3d(materials.add(unit_color)),
+                        //SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
+                        // TODO: The camera coordinate space is right-handed X-right, Y-up, Z-back.
+                        // This is probably not the way to deal with the camera coords...
+                        Transform::from_xyz(0.1 * x, 1., 0.1 * y),
+                    ));
                 }
-                Err(err) => {
-                    tracing::error!("Failed to parse XML file {:?}: {}", path, err);
-                }
+                //val,
             }
+            Err(err) => {
+                tracing::error!("Failed to parse XML file {:?}: {}", path, err);
+            }
+        }
+    }
+}
+
+fn compute_cell_color(
+    cell_height: u8,
+    x: f32,
+    y: f32,
+    playable_dimensions: MapDimension,
+    map_dimension: MapDimension,
+) -> Color {
+    let border_x = (map_dimension.x - playable_dimensions.x) / 2.;
+    let border_y = (map_dimension.y - playable_dimensions.y) / 2.;
+    if x < border_x || (map_dimension.x - x) < border_x {
+        return Color::from(palettes::tailwind::SLATE_500);
+    }
+    if y < border_y || (map_dimension.y - y) < border_y {
+        return Color::from(palettes::tailwind::SLATE_500);
+    }
+    let color = match cell_height {
+        0 => palettes::css::BLACK,
+        1 => palettes::css::LIGHT_BLUE,
+        2 => palettes::tailwind::YELLOW_100,
+        3 => palettes::css::DARK_GREEN,
+        _ => palettes::css::DARK_RED,
+    };
+    Color::from(color)
+}
+
+/// Transforms PlayableCoordinates into T3HeightMap Dimensions
+fn playable_dimensions_to_t3_map_dimensions(
+    (x, y): (f32, f32),
+    t3_map_size: MapDimension,
+    playable_dimensions: MapDimension,
+) -> (f32, f32) {
+    (
+        t3_map_size.x * (x / playable_dimensions.x),
+        t3_map_size.y * (y / playable_dimensions.y),
+    )
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub struct MapDimension {
+    x: f32,
+    y: f32,
+}
+
+impl MapDimension {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+}
+
+impl From<MapCellCoord> for MapDimension {
+    fn from(src: MapCellCoord) -> Self {
+        Self {
+            x: src.x as f32,
+            y: src.y as f32,
         }
     }
 }
