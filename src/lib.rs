@@ -1,3 +1,4 @@
+use bevy::prelude::*;
 pub mod error;
 pub use error::*;
 
@@ -17,3 +18,7 @@ pub mod utils;
 pub use utils::*;
 
 pub const MAP_SCALE_FACTOR: f32 = 0.1;
+
+// Holds the scene handle
+#[derive(Resource)]
+pub struct MapScene(pub Handle<Gltf>);

@@ -1,10 +1,14 @@
-use bevy::color::palettes;
+use super::t3_height_map::T3HeightMapRes;
+use crate::CELL_HEIGHT_MULTIPLIER;
+use crate::MAP_SCALE_FACTOR;
+use crate::MapScene;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use crate::cli::*;
 
 // In the observed map, for some reason the objects are placed 10 units from the origin...
-pub const PLACED_OBJECT_OFFSET: f32 = 10.;
+pub const PLACED_OBJECT_OFFSET: f32 = 0.;
+
+pub const MINERAL_FIELD_MULTIPLIER: f32 = 0.;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlacedObjects {
@@ -68,21 +72,65 @@ pub struct ObjectUnit {
     pub unit_kind: String,
 }
 
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct RichMineralField750Material;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct RichMineralFieldMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct MineralField750Material;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct MineralFieldMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct VespeneGeyserMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct RichVespeneGeyserMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct SpacePlatformGeyserMaterial;
+
 /// Loads the t3 height map.
 pub fn load_cache_objects(
     mut commands: Commands,
-    cli_params: Res<CliParams>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+    t3_height_map_res: Res<T3HeightMapRes>,
+    map_scene: Res<MapScene>,
+    gltf_assets: Res<Assets<Gltf>>,
+    mut loaded: Local<bool>,
+) -> Result<(), BevyError> {
+    // Only do this once
+    if *loaded {
+        return Ok(());
+    }
+    // Wait until the scene is loaded
+    let Some(gltf) = gltf_assets.get(&map_scene.0) else {
+        return Ok(());
+    };
 
     let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
-
     if let Ok(files_content) = std::fs::read_to_string(&path) {
         match serde_xml_rs::from_str::<PlacedObjects>(&files_content) {
             Ok(val) => {
-                tracing::info!("{:?}", val);
                 for unit in val.units {
+                    tracing::info!("{:?}", unit);
                     // ObjectUnit { id: "209", variation: "8", position: "97,102.5,0", scale: "1,1,1", unit_kind: "RichMineralField" }
                     let unit_pos: Vec<f32> = unit
                         .position
@@ -96,45 +144,36 @@ pub fn load_cache_objects(
                         );
                         continue;
                     }
-                    let unit_color: StandardMaterial = match unit.unit_kind.as_ref() {
-                        "RichMineralField750" => {
-                            let mut unit_col =
-                                StandardMaterial::from(Color::from(palettes::tailwind::ORANGE_600));
-                            unit_col.metallic = 1.0;
-                            unit_col
-                        }
-                        "RichMineralField" => {
-                            let mut unit_col =
-                                StandardMaterial::from(Color::from(palettes::tailwind::YELLOW_500));
-                            unit_col.metallic = 1.0;
-                            unit_col
-                        }
-                        "MineralField750" => {
-                            StandardMaterial::from(Color::from(palettes::tailwind::BLUE_600))
-                        }
-                        "MineralField" => {
-                            StandardMaterial::from(Color::from(palettes::tailwind::CYAN_400))
-                        }
-                        "RichVespeneGeyser" => {
-                            StandardMaterial::from(Color::from(palettes::tailwind::GREEN_500))
-                        }
-                        "VespeneGeyser" => {
-                            StandardMaterial::from(Color::from(palettes::tailwind::VIOLET_600))
-                        }
-                        "SpacePlatformGeyser" => {
-                            StandardMaterial::from(Color::from(palettes::tailwind::ROSE_600))
-                        }
-                        _ => StandardMaterial::from(Color::from(palettes::tailwind::NEUTRAL_500)),
+                    let Some(unit_material) = gltf.named_materials.get(unit.unit_kind.as_str())
+                    else {
+                        tracing::warn!("Unhandled ObjectUnit: {}", unit.unit_kind);
+                        continue;
                     };
                     let x = unit_pos[0] + PLACED_OBJECT_OFFSET;
                     let y = unit_pos[1] + PLACED_OBJECT_OFFSET;
+                    // x = t3_height_map.width - (idx as i32) % t3_height_map.width;
+                    // y = t3_height_map.width - idx as i32 / t3_height_map.width;
+                    let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
+                    let cell_height = t3_height_map_res.data[target_vec_pos];
+                    // TODO: continue the t3_height_map_res here.
+                    //let cell_height = t3_height_map_res.data[unit_pos[0] as usize * t3_height_map_res.width + unit_pos[1] as usize];
                     commands.spawn((
-                        Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(0.1, 8., 0.1)))),
-                        MeshMaterial3d(materials.add(unit_color)),
+                        MineralField750Material,
+                        Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+                            MAP_SCALE_FACTOR,
+                            MAP_SCALE_FACTOR,
+                            MAP_SCALE_FACTOR,
+                        )))),
+                        //MeshMaterial3d(materials.add(unit_color)),
+                        MeshMaterial3d(unit_material.clone()),
                         //SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
                         // TODO: The camera coordinate space is right-handed X-right, Y-up, Z-back.
                         // This is probably not the way to deal with the camera coords...
-                        Transform::from_xyz(0.1 * y, 0., 0.1 * x),
+                        Transform::from_xyz(
+                            MAP_SCALE_FACTOR * y,
+                            cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+                            MAP_SCALE_FACTOR * x,
+                        ),
                     ));
                 }
                 //val,
@@ -144,4 +183,6 @@ pub fn load_cache_objects(
             }
         }
     }
+    *loaded = true;
+    Ok(())
 }
