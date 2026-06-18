@@ -53,7 +53,7 @@ fn main() {
                 }
             },
         )
-        .add_systems(Startup, startup)
+        //.add_systems(Startup, startup)
         .run();
 }
 

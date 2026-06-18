@@ -4,7 +4,6 @@
 		"version":"2.0"
 	},
 	"extensionsUsed":[
-		"KHR_materials_emissive_strength",
 		"KHR_texture_transform"
 	],
 	"extensionsRequired":[
@@ -53,39 +52,129 @@
 		},
 		{
 			"mesh":1,
-			"name":"MineralField750"
+			"name":"MineralField750",
+			"translation":[
+				-3.602513074874878,
+				0,
+				-8.509782791137695
+			]
 		},
 		{
 			"mesh":2,
-			"name":"MineralField"
+			"name":"MineralField",
+			"translation":[
+				0,
+				0,
+				-8.589886665344238
+			]
 		},
 		{
 			"mesh":3,
-			"name":"RichMineralField750"
+			"name":"RichMineralField750",
+			"translation":[
+				-3.2830755710601807,
+				0,
+				4.581587791442871
+			]
 		},
 		{
 			"mesh":4,
-			"name":"RichMineralField"
+			"name":"RichMineralField",
+			"translation":[
+				0,
+				0,
+				4.574304103851318
+			]
 		},
 		{
 			"mesh":5,
-			"name":"RichVespeneGeyser"
+			"name":"RichVespeneGeyser",
+			"translation":[
+				0,
+				0,
+				-11.3071870803833
+			]
 		},
 		{
 			"mesh":6,
-			"name":"VespeneGeyser"
+			"name":"VespeneGeyser",
+			"translation":[
+				0,
+				0,
+				-5.976902961730957
+			]
 		},
 		{
 			"mesh":7,
-			"name":"SpacePlatformGeyser"
+			"name":"SpacePlatformGeyser",
+			"translation":[
+				-3.5117459297180176,
+				0,
+				-5.713545322418213
+			]
 		},
 		{
 			"mesh":8,
-			"name":"XelNagaTower"
+			"name":"XelNagaTower",
+			"translation":[
+				-3.6608240604400635,
+				0,
+				0
+			]
 		},
 		{
 			"mesh":9,
-			"name":"DestructibleRockEx1DiagonalHugeBLUR"
+			"name":"DestructibleRockEx1DiagonalHugeBLUR",
+			"translation":[
+				0,
+				0,
+				-2.827366828918457
+			]
+		}
+	],
+	"animations":[
+		{
+			"channels":[
+				{
+					"sampler":0,
+					"target":{
+						"node":1,
+						"path":"translation"
+					}
+				},
+				{
+					"sampler":1,
+					"target":{
+						"node":1,
+						"path":"rotation"
+					}
+				},
+				{
+					"sampler":2,
+					"target":{
+						"node":1,
+						"path":"scale"
+					}
+				}
+			],
+			"name":"CubeAction",
+			"samplers":[
+				{
+					"input":41,
+					"interpolation":"LINEAR",
+					"output":42
+				},
+				{
+					"input":41,
+					"interpolation":"LINEAR",
+					"output":43
+				},
+				{
+					"input":41,
+					"interpolation":"LINEAR",
+					"output":44
+				}
+			]
 		}
 	],
 	"materials":[
@@ -96,11 +185,6 @@
 				0.519537091255188,
 				1
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
@@ -163,19 +247,14 @@
 		{
 			"doubleSided":true,
 			"emissiveFactor":[
-				0.015230273827910423,
-				0.067088782787323,
+				0.09062249958515167,
+				0.11319956928491592,
 				1
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::MineralFieldMaterial":{}
 					}
 				]
 			},
@@ -235,18 +314,13 @@
 			"doubleSided":true,
 			"emissiveFactor":[
 				1,
-				0.15580029785633087,
-				0.016293363645672798
+				0.15592652559280396,
+				0.01599629782140255
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::RichMineralField750Material":{}
 					}
 				]
 			},
@@ -306,18 +380,13 @@
 			"doubleSided":true,
 			"emissiveFactor":[
 				1,
-				0.7171380519866943,
-				0.018672669306397438
+				0.7156937718391418,
+				0.018500223755836487
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::RichMineralFieldMaterial":{}
 					}
 				]
 			},
@@ -380,15 +449,10 @@
 				0.014636649750173092,
 				1
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::RichVespeneGeyserMaterial":{}
 					}
 				]
 			},
@@ -451,15 +515,10 @@
 				1,
 				0.09585227817296982
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::VespeneGeyserMaterial":{}
 					}
 				]
 			},
@@ -522,15 +581,10 @@
 				1,
 				0.008332464843988419
 			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::SpacePlatformGeyserMaterial":{}
 					}
 				]
 			},
@@ -588,20 +642,10 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				1,
-				0.018786434084177017,
-				0.9658081531524658
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
-						"api::MineralField750Material":{}
+						"api::XelNagaTowerMaterial":{}
 					}
 				]
 			},
@@ -659,16 +703,6 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				1,
-				0.34270572662353516,
-				0.34270572662353516
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":3
-				}
-			},
 			"extras":{
 				"skein":[
 					{
@@ -1352,6 +1386,36 @@
 			"componentType":5126,
 			"count":128,
 			"type":"VEC2"
+		},
+		{
+			"bufferView":41,
+			"componentType":5126,
+			"count":1,
+			"max":[
+				0.041666666666666664
+			],
+			"min":[
+				0.041666666666666664
+			],
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":42,
+			"componentType":5126,
+			"count":1,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":43,
+			"componentType":5126,
+			"count":1,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":44,
+			"componentType":5126,
+			"count":1,
+			"type":"VEC3"
 		}
 	],
 	"bufferViews":[
@@ -1600,6 +1664,26 @@
 			"byteLength":1024,
 			"byteOffset":46268,
 			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":4,
+			"byteOffset":47292
+		},
+		{
+			"buffer":0,
+			"byteLength":12,
+			"byteOffset":47296
+		},
+		{
+			"buffer":0,
+			"byteLength":16,
+			"byteOffset":47308
+		},
+		{
+			"buffer":0,
+			"byteLength":12,
+			"byteOffset":47324
 		}
 	],
 	"samplers":[
@@ -1610,7 +1694,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":47292,
+			"byteLength":47336,
 			"uri":"swarmy-objects.bin"
 		}
 	]

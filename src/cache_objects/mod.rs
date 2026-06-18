@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 pub const PLACED_OBJECT_OFFSET: f32 = 0.;
 
 pub const MINERAL_FIELD_MULTIPLIER: f32 = 0.;
+pub const XEL_NAGA_TOWER_HEIGHT: f32 = 25.0;
+pub const XEL_NAGA_TOWER_RADIUS: f32 = 0.5;
+pub const DESTRUCTIBLE_ROCKS_HEIGHT: f32 = 5.0;
+pub const DESTRUCTIBLE_ROCKS_RADIUS: f32 = 5.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlacedObjects {
@@ -107,6 +111,16 @@ pub struct RichVespeneGeyserMaterial;
 #[type_path = "api"]
 pub struct SpacePlatformGeyserMaterial;
 
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct XelNagaTowerMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct DestructibleRockEx1DiagonalHugeBLURMaterial;
+
 /// Loads the t3 height map.
 pub fn load_cache_objects(
     mut commands: Commands,
@@ -146,35 +160,112 @@ pub fn load_cache_objects(
                     }
                     let Some(unit_material) = gltf.named_materials.get(unit.unit_kind.as_str())
                     else {
-                        tracing::warn!("Unhandled ObjectUnit: {}", unit.unit_kind);
+                        tracing::warn!(
+                            "Unhandled Skein GLTF named_material Unit: {}",
+                            unit.unit_kind
+                        );
                         continue;
                     };
+                    let mesh_material = MeshMaterial3d(unit_material.clone());
                     let x = unit_pos[0] + PLACED_OBJECT_OFFSET;
                     let y = unit_pos[1] + PLACED_OBJECT_OFFSET;
-                    // x = t3_height_map.width - (idx as i32) % t3_height_map.width;
-                    // y = t3_height_map.width - idx as i32 / t3_height_map.width;
                     let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
                     let cell_height = t3_height_map_res.data[target_vec_pos];
-                    // TODO: continue the t3_height_map_res here.
-                    //let cell_height = t3_height_map_res.data[unit_pos[0] as usize * t3_height_map_res.width + unit_pos[1] as usize];
-                    commands.spawn((
-                        MineralField750Material,
-                        Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
-                            MAP_SCALE_FACTOR,
-                            MAP_SCALE_FACTOR,
-                            MAP_SCALE_FACTOR,
-                        )))),
-                        //MeshMaterial3d(materials.add(unit_color)),
-                        MeshMaterial3d(unit_material.clone()),
-                        //SceneRoot(asset_server.load(GltfAssetLabel::Mesh(0).from_asset("swarmy-objects.gltf"))),
-                        // TODO: The camera coordinate space is right-handed X-right, Y-up, Z-back.
-                        // This is probably not the way to deal with the camera coords...
+                    let mineral_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+                        MAP_SCALE_FACTOR,
+                        MAP_SCALE_FACTOR,
+                        MAP_SCALE_FACTOR,
+                    ))));
+                    let xel_naga_mesh = Mesh3d(meshes.add(Cylinder::new(
+                        XEL_NAGA_TOWER_RADIUS * MAP_SCALE_FACTOR,
+                        XEL_NAGA_TOWER_HEIGHT * MAP_SCALE_FACTOR,
+                    )));
+                    let destructible_rock_ex1_diagonal_huge_blur_material_mesh =
+                        Mesh3d(meshes.add(Cylinder::new(
+                            DESTRUCTIBLE_ROCKS_RADIUS * MAP_SCALE_FACTOR,
+                            DESTRUCTIBLE_ROCKS_HEIGHT * MAP_SCALE_FACTOR,
+                        )));
+                    let mineral_transform = Transform::from_xyz(
+                        MAP_SCALE_FACTOR * y,
+                        cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+                        MAP_SCALE_FACTOR * x,
+                    );
+                    let xel_naga_transform = Transform::from_xyz(
+                        MAP_SCALE_FACTOR * y,
+                        XEL_NAGA_TOWER_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
+                        MAP_SCALE_FACTOR * x,
+                    );
+                    let destructible_rock_ex1_diagonal_huge_blur_material_transform =
                         Transform::from_xyz(
                             MAP_SCALE_FACTOR * y,
-                            cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+                            DESTRUCTIBLE_ROCKS_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
                             MAP_SCALE_FACTOR * x,
-                        ),
-                    ));
+                        );
+                    match unit.unit_kind.as_ref() {
+                        "RichMineralField750" => commands.spawn((
+                            RichMineralField750Material,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "RichMineralField" => commands.spawn((
+                            RichMineralFieldMaterial,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "MineralField750" => commands.spawn((
+                            MineralField750Material,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "MineralField" => commands.spawn((
+                            MineralFieldMaterial,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "RichVespeneGeyser" => commands.spawn((
+                            RichVespeneGeyserMaterial,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "VespeneGeyser" => commands.spawn((
+                            VespeneGeyserMaterial,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "SpacePlatformGeyser" => commands.spawn((
+                            SpacePlatformGeyserMaterial,
+                            mineral_mesh,
+                            mesh_material,
+                            mineral_transform,
+                        )),
+                        "XelNagaTower" => commands.spawn((
+                            XelNagaTowerMaterial,
+                            xel_naga_mesh,
+                            mesh_material,
+                            xel_naga_transform,
+                        )),
+                        "DestructibleRockEx1DiagonalHugeBLUR" => commands.spawn((
+                            DestructibleRockEx1DiagonalHugeBLURMaterial,
+                            destructible_rock_ex1_diagonal_huge_blur_material_mesh,
+                            mesh_material,
+                            destructible_rock_ex1_diagonal_huge_blur_material_transform,
+                        )),
+                        _ => {
+                            tracing::warn!("Unhandled unit_kind: {}", unit.unit_kind);
+                            commands.spawn((
+                                RichMineralFieldMaterial,
+                                mineral_mesh,
+                                mesh_material,
+                                mineral_transform,
+                            ))
+                        }
+                    };
                 }
                 //val,
             }
