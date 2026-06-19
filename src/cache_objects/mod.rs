@@ -5,14 +5,18 @@ use crate::MapScene;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-// In the observed map, for some reason the objects are placed 10 units from the origin...
-pub const PLACED_OBJECT_OFFSET: f32 = 0.;
-
-pub const MINERAL_FIELD_MULTIPLIER: f32 = 0.;
+// A few Object Units.
 pub const XEL_NAGA_TOWER_HEIGHT: f32 = 25.0;
 pub const XEL_NAGA_TOWER_RADIUS: f32 = 0.5;
 pub const DESTRUCTIBLE_ROCKS_HEIGHT: f32 = 5.0;
 pub const DESTRUCTIBLE_ROCKS_RADIUS: f32 = 5.0;
+
+// Testing a Dooda.
+pub const SHADOW_PLATFORM_RAMP_SIZE: f32 = 1.0;
+
+// Testing Object Points.
+pub const NO_FLY_ZONE_HEIGHT: f32 = 25.0;
+pub const NO_FLY_ZONE_RADIUS: f32 = 0.5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlacedObjects {
@@ -121,6 +125,36 @@ pub struct XelNagaTowerMaterial;
 #[type_path = "api"]
 pub struct DestructibleRockEx1DiagonalHugeBLURMaterial;
 
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct UnknownUnit;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct ShadowPlatformRampMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct UnknownDoodaMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct NoFlyZoneMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct UnknownObjectPointMaterial;
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+#[type_path = "api"]
+pub struct StartLocMaterial;
+
 /// Loads the t3 height map.
 pub fn load_cache_objects(
     mut commands: Commands,
@@ -140,139 +174,238 @@ pub fn load_cache_objects(
     };
 
     let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
-    if let Ok(files_content) = std::fs::read_to_string(&path) {
-        match serde_xml_rs::from_str::<PlacedObjects>(&files_content) {
-            Ok(val) => {
-                for unit in val.units {
-                    tracing::info!("{:?}", unit);
-                    // ObjectUnit { id: "209", variation: "8", position: "97,102.5,0", scale: "1,1,1", unit_kind: "RichMineralField" }
-                    let unit_pos: Vec<f32> = unit
-                        .position
-                        .split(",")
-                        .filter_map(|x| x.parse::<f32>().ok())
-                        .collect();
-                    if unit_pos.len() != 3 {
-                        tracing::error!(
-                            "Unexpected number of tokens for unit position typed: {}",
-                            unit.unit_kind
-                        );
-                        continue;
-                    }
-                    let Some(unit_material) = gltf.named_materials.get(unit.unit_kind.as_str())
-                    else {
-                        tracing::warn!(
-                            "Unhandled Skein GLTF named_material Unit: {}",
-                            unit.unit_kind
-                        );
-                        continue;
-                    };
-                    let mesh_material = MeshMaterial3d(unit_material.clone());
-                    let x = unit_pos[0] + PLACED_OBJECT_OFFSET;
-                    let y = unit_pos[1] + PLACED_OBJECT_OFFSET;
-                    let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
-                    let cell_height = t3_height_map_res.data[target_vec_pos];
-                    let mineral_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
-                        MAP_SCALE_FACTOR,
-                        MAP_SCALE_FACTOR,
-                        MAP_SCALE_FACTOR,
-                    ))));
-                    let xel_naga_mesh = Mesh3d(meshes.add(Cylinder::new(
-                        XEL_NAGA_TOWER_RADIUS * MAP_SCALE_FACTOR,
-                        XEL_NAGA_TOWER_HEIGHT * MAP_SCALE_FACTOR,
-                    )));
-                    let destructible_rock_ex1_diagonal_huge_blur_material_mesh =
-                        Mesh3d(meshes.add(Cylinder::new(
-                            DESTRUCTIBLE_ROCKS_RADIUS * MAP_SCALE_FACTOR,
-                            DESTRUCTIBLE_ROCKS_HEIGHT * MAP_SCALE_FACTOR,
-                        )));
-                    let mineral_transform = Transform::from_xyz(
-                        MAP_SCALE_FACTOR * y,
-                        cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
-                        MAP_SCALE_FACTOR * x,
-                    );
-                    let xel_naga_transform = Transform::from_xyz(
-                        MAP_SCALE_FACTOR * y,
-                        XEL_NAGA_TOWER_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
-                        MAP_SCALE_FACTOR * x,
-                    );
-                    let destructible_rock_ex1_diagonal_huge_blur_material_transform =
-                        Transform::from_xyz(
-                            MAP_SCALE_FACTOR * y,
-                            DESTRUCTIBLE_ROCKS_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
-                            MAP_SCALE_FACTOR * x,
-                        );
-                    match unit.unit_kind.as_ref() {
-                        "RichMineralField750" => commands.spawn((
-                            RichMineralField750Material,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "RichMineralField" => commands.spawn((
-                            RichMineralFieldMaterial,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "MineralField750" => commands.spawn((
-                            MineralField750Material,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "MineralField" => commands.spawn((
-                            MineralFieldMaterial,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "RichVespeneGeyser" => commands.spawn((
-                            RichVespeneGeyserMaterial,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "VespeneGeyser" => commands.spawn((
-                            VespeneGeyserMaterial,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "SpacePlatformGeyser" => commands.spawn((
-                            SpacePlatformGeyserMaterial,
-                            mineral_mesh,
-                            mesh_material,
-                            mineral_transform,
-                        )),
-                        "XelNagaTower" => commands.spawn((
-                            XelNagaTowerMaterial,
-                            xel_naga_mesh,
-                            mesh_material,
-                            xel_naga_transform,
-                        )),
-                        "DestructibleRockEx1DiagonalHugeBLUR" => commands.spawn((
-                            DestructibleRockEx1DiagonalHugeBLURMaterial,
-                            destructible_rock_ex1_diagonal_huge_blur_material_mesh,
-                            mesh_material,
-                            destructible_rock_ex1_diagonal_huge_blur_material_transform,
-                        )),
-                        _ => {
-                            tracing::warn!("Unhandled unit_kind: {}", unit.unit_kind);
-                            commands.spawn((
-                                RichMineralFieldMaterial,
-                                mineral_mesh,
-                                mesh_material,
-                                mineral_transform,
-                            ))
-                        }
-                    };
-                }
-                //val,
-            }
-            Err(err) => {
-                tracing::error!("Failed to parse XML file {:?}: {}", path, err);
-            }
+    let files_content = std::fs::read_to_string(&path)?;
+    let placed_objects = serde_xml_rs::from_str::<PlacedObjects>(&files_content)?;
+    let mineral_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+        MAP_SCALE_FACTOR,
+        MAP_SCALE_FACTOR,
+        MAP_SCALE_FACTOR,
+    ))));
+    let xel_naga_mesh = Mesh3d(meshes.add(Cylinder::new(
+        XEL_NAGA_TOWER_RADIUS * MAP_SCALE_FACTOR,
+        XEL_NAGA_TOWER_HEIGHT * MAP_SCALE_FACTOR,
+    )));
+    let destructible_rock_ex1_diagonal_huge_blur_material_mesh = Mesh3d(meshes.add(Cylinder::new(
+        DESTRUCTIBLE_ROCKS_RADIUS * MAP_SCALE_FACTOR,
+        DESTRUCTIBLE_ROCKS_HEIGHT * MAP_SCALE_FACTOR,
+    )));
+    for unit in placed_objects.units {
+        tracing::info!("{:?}", unit);
+        // ObjectUnit { id: "209", variation: "8", position: "97,102.5,0", scale: "1,1,1", unit_kind: "RichMineralField" }
+        let unit_pos: Vec<f32> = unit
+            .position
+            .split(",")
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
+        if unit_pos.len() != 3 {
+            tracing::error!(
+                "Unexpected number of tokens for unit position typed: {}",
+                unit.unit_kind
+            );
+            continue;
         }
+        let Some(unit_material) = gltf.named_materials.get(unit.unit_kind.as_str()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF named_material Unit: {}",
+                unit.unit_kind
+            );
+            continue;
+        };
+        let mesh_material = MeshMaterial3d(unit_material.clone());
+        let x = unit_pos[0];
+        let y = unit_pos[1];
+        let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
+        let cell_height = t3_height_map_res.data[target_vec_pos];
+        let mineral_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        let xel_naga_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            XEL_NAGA_TOWER_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        let destructible_rock_ex1_diagonal_huge_blur_material_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            DESTRUCTIBLE_ROCKS_HEIGHT * 0.5 * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        match unit.unit_kind.as_ref() {
+            "RichMineralField750" => commands.spawn((
+                RichMineralField750Material,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "RichMineralField" => commands.spawn((
+                RichMineralFieldMaterial,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "MineralField750" => commands.spawn((
+                MineralField750Material,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "MineralField" => commands.spawn((
+                MineralFieldMaterial,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "RichVespeneGeyser" => commands.spawn((
+                RichVespeneGeyserMaterial,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "VespeneGeyser" => commands.spawn((
+                VespeneGeyserMaterial,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "SpacePlatformGeyser" => commands.spawn((
+                SpacePlatformGeyserMaterial,
+                mineral_mesh.clone(),
+                mesh_material,
+                mineral_transform,
+            )),
+            "XelNagaTower" => commands.spawn((
+                XelNagaTowerMaterial,
+                xel_naga_mesh.clone(),
+                mesh_material,
+                xel_naga_transform,
+            )),
+            "DestructibleRockEx1DiagonalHugeBLUR" => commands.spawn((
+                DestructibleRockEx1DiagonalHugeBLURMaterial,
+                destructible_rock_ex1_diagonal_huge_blur_material_mesh.clone(),
+                mesh_material,
+                destructible_rock_ex1_diagonal_huge_blur_material_transform,
+            )),
+            _ => {
+                tracing::warn!("Unhandled unit_kind: {}", unit.unit_kind);
+                commands.spawn((
+                    RichMineralFieldMaterial,
+                    mineral_mesh.clone(),
+                    mesh_material,
+                    mineral_transform,
+                ))
+            }
+        };
+    }
+    let shadow_platform_ramp_material = Mesh3d(meshes.add(Cuboid::new(
+        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
+        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
+        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
+    )));
+    // Id="1231" Position="118.1433,8.0437,6.9763" Scale="1,1,1" Type="Shadow_Platform_Ramp"
+    for dooda in placed_objects.doodas {
+        // These are objects in the map, decorations, animation references, etc.
+        let unit_pos: Vec<f32> = dooda
+            .position
+            .split(",")
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
+        if unit_pos.len() != 3 {
+            tracing::error!(
+                "Unexpected number of tokens for unit position typed: {}",
+                dooda.kind
+            );
+            continue;
+        }
+        let x = unit_pos[0];
+        let y = unit_pos[1];
+        let Some(unit_material) = gltf.named_materials.get(dooda.kind.as_str()) else {
+            tracing::warn!("Unhandled Skein GLTF named_material Dooda: {}", dooda.kind);
+            continue;
+        };
+        let shadow_platform_ramp_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        let mesh_material = MeshMaterial3d(unit_material.clone());
+        match dooda.kind.as_str() {
+            "Shadow_Platform_Ramp" => commands.spawn((
+                ShadowPlatformRampMaterial,
+                shadow_platform_ramp_material.clone(),
+                mesh_material,
+                shadow_platform_ramp_transform,
+            )),
+            _ => commands.spawn((
+                UnknownDoodaMaterial,
+                shadow_platform_ramp_material.clone(),
+                mesh_material,
+                shadow_platform_ramp_transform,
+            )),
+        };
+    }
+    // Id="1035" Position="6.0996,150.3146,0" Scale="1,1,1" Type="NoFlyZone" Name="No Fly Zone 011" Color="0,0,0,0" PathingRadiusSoft="5" PathingRadiusHard="4"
+    for object_point in placed_objects.points {
+        // These are objects in the map, decorations, animation references, etc.
+        let unit_pos: Vec<f32> = object_point
+            .position
+            .split(",")
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
+        if unit_pos.len() != 3 {
+            tracing::error!(
+                "Unexpected number of tokens for unit position typed: {}",
+                object_point.kind
+            );
+            continue;
+        }
+        let x = unit_pos[0];
+        let y = unit_pos[1];
+        let z = unit_pos[2];
+        let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
+        let cell_height = t3_height_map_res.data[target_vec_pos];
+        let Some(unit_material) = gltf.named_materials.get(object_point.kind.as_str()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF named_material ObjectPoint: {}",
+                object_point.kind
+            );
+            continue;
+        };
+        let pathing_radius_soft = object_point.pathing_radius_soft as f32;
+        let _pathing_radius_hard = object_point.pathing_radius_hard as f32;
+        let torus_mesh = Mesh3d(meshes.add(Torus::new(0.2, 0.25)));
+        let cylinder_mesh = Mesh3d(meshes.add(Cylinder::new(
+            pathing_radius_soft * NO_FLY_ZONE_RADIUS * MAP_SCALE_FACTOR,
+            NO_FLY_ZONE_HEIGHT * MAP_SCALE_FACTOR,
+        )));
+        let cylinder_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            z + cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        // TODO: We should use the alpha channel, dunno if we need glsl for that tho because it's
+        // being set from blender and exported to gltf.
+        let mesh_material = MeshMaterial3d(unit_material.clone());
+        match object_point.kind.as_str() {
+            "NoFlyZone" => commands.spawn((
+                NoFlyZoneMaterial,
+                cylinder_mesh,
+                mesh_material,
+                cylinder_transform,
+            )),
+            "StartLoc" => commands.spawn((
+                StartLocMaterial,
+                torus_mesh,
+                mesh_material,
+                cylinder_transform,
+            )),
+            _ => commands.spawn((
+                UnknownObjectPointMaterial,
+                shadow_platform_ramp_material.clone(),
+                cylinder_mesh,
+                cylinder_transform,
+            )),
+        };
     }
     *loaded = true;
     Ok(())
