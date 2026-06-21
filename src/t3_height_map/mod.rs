@@ -2,6 +2,7 @@ use super::error::*;
 use super::utils::*;
 use crate::MAP_SCALE_FACTOR;
 use crate::cli::*;
+use bevy::camera::Hdr;
 use bevy::camera_controller::free_camera::FreeCamera;
 use bevy::color::palettes;
 use bevy::core_pipeline::prepass::{DepthPrepass, NormalPrepass};
@@ -9,7 +10,6 @@ use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::log::tracing;
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
-use bevy::render::view::Hdr;
 use chrono::DateTime;
 use s2protocol::cache_handles::document_header::*;
 use s2protocol::cache_handles::map::coords::*;
@@ -127,7 +127,7 @@ pub fn load_t3_height_map(
     // light
     commands.spawn((
         PointLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         Transform::from_xyz(4.0, 8.0, 4.0),
@@ -151,7 +151,7 @@ pub fn load_t3_height_map(
                 ..default()
             },
             TextColor(Color::from(palettes::css::RED)),
-            TextLayout::new_with_justify(Justify::Right),
+            TextLayout::default().with_justify(Justify::Right),
         ));
         tracing::error!("Unable to locate MapInfo the cache handles provided");
         return Ok(());
@@ -205,9 +205,9 @@ pub fn load_t3_height_map(
             ..default()
         },
         TextColor(Color::from(palettes::css::GREEN)),
-        TextLayout::new_with_justify(Justify::Right),
+        TextLayout::default().with_justify(Justify::Right),
         TextFont {
-            font_size: 14.,
+            font_size: bevy::prelude::FontSize::Px(14.),
             ..default()
         },
     ));
@@ -260,9 +260,9 @@ pub fn load_t3_height_map(
                 ..default()
             },
             TextColor(Color::from(palettes::css::GOLD)),
-            TextLayout::new_with_justify(Justify::Right),
+            TextLayout::default().with_justify(Justify::Right),
             TextFont {
-                font_size: 14.,
+                font_size: bevy::prelude::FontSize::Px(14.),
                 ..default()
             },
         ));

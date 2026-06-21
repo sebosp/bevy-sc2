@@ -2,6 +2,8 @@ use super::t3_height_map::T3HeightMapRes;
 use crate::CELL_HEIGHT_MULTIPLIER;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
+use crate::standard_material_from_gltf_material;
+use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -162,6 +164,8 @@ pub fn load_cache_objects(
     t3_height_map_res: Res<T3HeightMapRes>,
     map_scene: Res<MapScene>,
     gltf_assets: Res<Assets<Gltf>>,
+    gltf_materials: Res<Assets<GltfMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut loaded: Local<bool>,
 ) -> Result<(), BevyError> {
     // Only do this once
@@ -204,14 +208,23 @@ pub fn load_cache_objects(
             );
             continue;
         }
-        let Some(unit_material) = gltf.named_materials.get(unit.unit_kind.as_str()) else {
+        let Some(unit_handle) = gltf.named_materials.get(unit.unit_kind.as_str()) else {
             tracing::warn!(
                 "Unhandled Skein GLTF named_material Unit: {}",
                 unit.unit_kind
             );
             continue;
         };
-        let mesh_material = MeshMaterial3d(unit_material.clone());
+        let Some(unit_gltf_material) = gltf_materials.get(unit_handle.id()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF gltf_material Unit: {}",
+                unit.unit_kind
+            );
+            continue;
+        };
+        let unit_material = MeshMaterial3d(
+            materials.add(standard_material_from_gltf_material(&unit_gltf_material)),
+        );
         let x = unit_pos[0];
         let y = unit_pos[1];
         let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
@@ -235,55 +248,55 @@ pub fn load_cache_objects(
             "RichMineralField750" => commands.spawn((
                 RichMineralField750Material,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "RichMineralField" => commands.spawn((
                 RichMineralFieldMaterial,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "MineralField750" => commands.spawn((
                 MineralField750Material,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "MineralField" => commands.spawn((
                 MineralFieldMaterial,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "RichVespeneGeyser" => commands.spawn((
                 RichVespeneGeyserMaterial,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "VespeneGeyser" => commands.spawn((
                 VespeneGeyserMaterial,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "SpacePlatformGeyser" => commands.spawn((
                 SpacePlatformGeyserMaterial,
                 mineral_mesh.clone(),
-                mesh_material,
+                unit_material,
                 mineral_transform,
             )),
             "XelNagaTower" => commands.spawn((
                 XelNagaTowerMaterial,
                 xel_naga_mesh.clone(),
-                mesh_material,
+                unit_material,
                 xel_naga_transform,
             )),
             "DestructibleRockEx1DiagonalHugeBLUR" => commands.spawn((
                 DestructibleRockEx1DiagonalHugeBLURMaterial,
                 destructible_rock_ex1_diagonal_huge_blur_material_mesh.clone(),
-                mesh_material,
+                unit_material,
                 destructible_rock_ex1_diagonal_huge_blur_material_transform,
             )),
             _ => {
@@ -291,13 +304,13 @@ pub fn load_cache_objects(
                 commands.spawn((
                     RichMineralFieldMaterial,
                     mineral_mesh.clone(),
-                    mesh_material,
+                    unit_material,
                     mineral_transform,
                 ))
             }
         };
     }
-    let shadow_platform_ramp_material = Mesh3d(meshes.add(Cuboid::new(
+    let shadow_platform_ramp_mesh = Mesh3d(meshes.add(Cuboid::new(
         SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
         SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
         SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
@@ -319,27 +332,35 @@ pub fn load_cache_objects(
         }
         let x = unit_pos[0];
         let y = unit_pos[1];
-        let Some(unit_material) = gltf.named_materials.get(dooda.kind.as_str()) else {
+
+        let Some(unit_handle) = gltf.named_materials.get(dooda.kind.as_str()) else {
             tracing::warn!("Unhandled Skein GLTF named_material Dooda: {}", dooda.kind);
             continue;
         };
+        let Some(unit_gltf_material) = gltf_materials.get(unit_handle.id()) else {
+            tracing::warn!("Unhandled Skein GLTF gltf_material Dooda: {}", dooda.kind);
+            continue;
+        };
+        let dooda_material = MeshMaterial3d(
+            materials.add(standard_material_from_gltf_material(&unit_gltf_material)),
+        );
+
         let shadow_platform_ramp_transform = Transform::from_xyz(
             MAP_SCALE_FACTOR * y,
             SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
             MAP_SCALE_FACTOR * x,
         );
-        let mesh_material = MeshMaterial3d(unit_material.clone());
         match dooda.kind.as_str() {
             "Shadow_Platform_Ramp" => commands.spawn((
                 ShadowPlatformRampMaterial,
-                shadow_platform_ramp_material.clone(),
-                mesh_material,
+                shadow_platform_ramp_mesh.clone(),
+                dooda_material,
                 shadow_platform_ramp_transform,
             )),
             _ => commands.spawn((
                 UnknownDoodaMaterial,
-                shadow_platform_ramp_material.clone(),
-                mesh_material,
+                shadow_platform_ramp_mesh.clone(),
+                dooda_material,
                 shadow_platform_ramp_transform,
             )),
         };
@@ -364,13 +385,24 @@ pub fn load_cache_objects(
         let z = unit_pos[2];
         let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
         let cell_height = t3_height_map_res.data[target_vec_pos];
-        let Some(unit_material) = gltf.named_materials.get(object_point.kind.as_str()) else {
+
+        let Some(unit_handle) = gltf.named_materials.get(object_point.kind.as_str()) else {
             tracing::warn!(
                 "Unhandled Skein GLTF named_material ObjectPoint: {}",
                 object_point.kind
             );
             continue;
         };
+        let Some(unit_gltf_material) = gltf_materials.get(unit_handle.id()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF gltf_material ObjectPoint: {}",
+                object_point.kind
+            );
+            continue;
+        };
+        let object_point_material = MeshMaterial3d(
+            materials.add(standard_material_from_gltf_material(&unit_gltf_material)),
+        );
         let pathing_radius_soft = object_point.pathing_radius_soft as f32;
         let _pathing_radius_hard = object_point.pathing_radius_hard as f32;
         let torus_mesh = Mesh3d(meshes.add(Torus::new(0.2, 0.25)));
@@ -385,23 +417,22 @@ pub fn load_cache_objects(
         );
         // TODO: We should use the alpha channel, dunno if we need glsl for that tho because it's
         // being set from blender and exported to gltf.
-        let mesh_material = MeshMaterial3d(unit_material.clone());
         match object_point.kind.as_str() {
             "NoFlyZone" => commands.spawn((
                 NoFlyZoneMaterial,
                 cylinder_mesh,
-                mesh_material,
+                object_point_material,
                 cylinder_transform,
             )),
             "StartLoc" => commands.spawn((
                 StartLocMaterial,
                 torus_mesh,
-                mesh_material,
+                object_point_material,
                 cylinder_transform,
             )),
             _ => commands.spawn((
                 UnknownObjectPointMaterial,
-                shadow_platform_ramp_material.clone(),
+                shadow_platform_ramp_mesh.clone(),
                 cylinder_mesh,
                 cylinder_transform,
             )),
