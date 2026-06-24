@@ -2,3 +2,5 @@
 /target
 # This file contains environment-specific configuration like linker settings
 .cargo/config.toml
+# I store the last command because history across repos gets lost
+lastcmd

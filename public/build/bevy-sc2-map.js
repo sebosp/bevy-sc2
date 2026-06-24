@@ -2372,7 +2372,7 @@ async function __wbg_init(module_or_path) {
     }
 
     if (typeof module_or_path === 'undefined') {
-        module_or_path = new URL('bevy-sc2-map_bg.wasm', import.meta.url);
+        module_or_path = new URL('swarmy-bevy_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 

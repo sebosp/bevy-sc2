@@ -1,35 +1,39 @@
 [package]
-name = "bevy-sc2-map"
+name = "swarmy-bevy"
 authors = ["Seb Ospina <kraige@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = "0.17"
+bevy = { version = "0.19.0", features = ["free_camera", "jpeg", "dds", "tga"] }
+bevy_skein = "0.6.0"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
-s2protocol = { version = "3.4.1", default-features = false, features = [
-    "tracing_off",
+s2protocol = { path = "../s2protocol-rs/", default-features = false, features = [
+    "tracing_info_level",
 ] }
 tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
 nom = "8.0.0"
-nom-mpq = "2.0.5"
+nom-mpq = "2.0"
 thiserror = "2.0.17"
-bevy_http_client = "0.9.0"
+clap = { version = "4.6", features = ["derive"] }
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde-xml-rs = "0.8"
 
-[target.wasm32-unknown-unknown.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }
 
 [features]
 # Default to a native dev build.
-default = ["dev_native"]
+default = ["dev"]
 dev = [
     # Improve compile times for dev builds by linking Bevy as a dynamic library.
     "bevy/dynamic_linking",
@@ -51,12 +55,12 @@ dev_native = [
 # Disable dev features for release builds.
 default-features = false
 
-[package.metadata.bevy_cli.web]
+#[package.metadata.bevy_cli.web]
 # Disable native features for web builds.
-default-features = false
+#default-features = false
 
-[package.metadata.bevy_cli.web.dev]
-features = ["dev"]
+#[package.metadata.bevy_cli.web.dev]
+#features = ["dev"]
 
 
 [lints.rust]
@@ -103,14 +107,14 @@ codegen-units = 1
 lto = "thin"
 
 # This profile will be used by `bevy run web` automatically.
-[profile.web-release]
+#[profile.web-release]
 # Default to release profile values.
-inherits = "release"
+#inherits = "release"
 # Optimize with size in mind (also try "z", sometimes it is better).
 # Slightly slows compile times, great improvements to file size and runtime performance.
-opt-level = "s"
+#opt-level = "s"
 # Strip all debugging information from the binary to slightly reduce file size.
-strip = "debuginfo"
+#strip = "debuginfo"
 
 # Optimize for build time in CI.
 [profile.ci]

@@ -5,8 +5,6 @@ use std::num::TryFromIntError;
 use nom::error::ErrorKind;
 use nom::error::ParseError;
 
-use crate::MapTerrainCoord;
-
 /// Holds the result of parsing progress and the possibly failures
 pub type BevySC2MapResult<I, O> = Result<(I, O), BevySC2MapError>;
 
@@ -18,6 +16,9 @@ pub enum BevySC2MapError {
     /// Unable to parse the byte aligned data types
     #[error("Nom ByteAligned Error {0}")]
     ByteAligned(String),
+    /// Unable to parse the MPQ file, could be corrupted or not a replay file
+    #[error("S2ProtocolError")]
+    S2Proto(#[from] s2protocol::S2ProtocolError),
     /// Unable to parse a value that should have been an integer
     #[error("TryFromIntError")]
     ValueError(#[from] TryFromIntError),
@@ -27,21 +28,6 @@ pub enum BevySC2MapError {
     /// Conversion to UTF-8 failed, from the `Vec<u8>` "name" fields in the proto fields
     #[error("Utf8 conversion error")]
     Utf8Error(#[from] std::str::Utf8Error),
-    /// Map Size is bigger than max supported in game (I guess...)
-    #[error("Expected max 256 for map size, got {0}")]
-    InvalidMapSize(i32),
-    // /The map coordinates bounds are invalid
-    #[error("Expected coordinate {0} to be less than {1}")]
-    InvalidCoordinateBounds(String, i32, String, i32),
-    /// The MapInfo and t3HeightMay dimensions do not match
-    #[error("T3 Height Map Terrain Dimensions {0:?} do not match Map Info Map Dimensions {1:?}")]
-    T3HeightDimDoNotMatchMapInfoDim(MapTerrainCoord, MapTerrainCoord),
-    /// Expected at least n bytes but got x bytes
-    #[error("Expected at least {0} bytes, got {1} bytes")]
-    T3HeightNotEnoughBytes(usize, usize),
-    /// The height unit is out of bounds.
-    #[error("Height unit out of bounds should be between 1 and 4, but got: {0}")]
-    T3HeightUnitOutOfBounds(i32),
     /// Other error
     #[error("Other Error: {0}")]
     Other(String),
