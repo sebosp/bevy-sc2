@@ -20,13 +20,16 @@ use tracing::instrument;
 
 pub const CELL_HEIGHT_MULTIPLIER: f32 = 5.;
 
+/// A copy of the T3HeightMap that impls Reflect, Resource.
 #[derive(Resource, Default, Reflect, Debug)]
 #[reflect(Resource, Default)]
-pub struct T3HeightMapRes {
+pub struct T3HeightMapResource {
     pub width: usize,
     pub height: usize,
     pub data: Vec<u8>,
 }
+
+/// A so-far unused TerrainCell.
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
 #[type_path = "api"]
@@ -245,13 +248,8 @@ pub fn load_t3_height_map(
         commands.spawn((
             Text::new(format!(
                 "{} - {}\n\
-                    {}\n\
-                    Map Dates: {} - {}",
-                docu_header.name,
-                docu_header.mod_info,
-                docu_header.description_long,
-                maybe_dt_1,
-                maybe_dt_2
+                    {}\n",
+                docu_header.name, docu_header.mod_info, docu_header.description_long,
             )),
             Node {
                 position_type: PositionType::Absolute,
@@ -311,7 +309,7 @@ pub fn load_t3_height_map(
             ),
         ));
     }
-    let t3_height_map_res = T3HeightMapRes {
+    let t3_height_map_res = T3HeightMapResource {
         data: cell_x_y_data,
         width: t3_height_map.width as usize,
         height: t3_height_map.height as usize,

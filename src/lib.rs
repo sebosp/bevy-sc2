@@ -12,6 +12,8 @@ pub mod t3_height_map;
 pub use t3_height_map::*;
 pub mod cache_objects;
 pub use cache_objects::*;
+pub mod t3_terrain;
+pub use t3_terrain::*;
 
 pub mod cli;
 

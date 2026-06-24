@@ -4,6 +4,7 @@ use bevy_skein::SkeinPlugin;
 use clap::Parser;
 use swarmy_bevy::MapScene;
 use swarmy_bevy::t3_height_map::load_t3_height_map;
+use swarmy_bevy::t3_terrain::load_t3_terrain;
 use swarmy_bevy::utils::*;
 use swarmy_bevy::{cli::*, load_cache_objects};
 
@@ -15,6 +16,7 @@ impl Plugin for MapPlugin {
         app.add_systems(Startup, setup_light_and_gizmo_control_text);
         app.add_systems(Startup, load_t3_height_map);
         app.add_systems(Update, load_cache_objects);
+        app.add_systems(Update, load_t3_terrain);
         app.add_systems(Update, update_gizmo_config);
     }
 }
@@ -58,7 +60,8 @@ fn setup_light_and_gizmo_control_text(mut commands: Commands) {
             "Controls:\n\
             W/A/S/D to move (Shift for speed)\n\
             Mouse drag (scroll for speed)\n\
-            B for AABB",
+            B for AABB\n\
+            M for lock/unlock mouse navigation",
         ),
         Node {
             position_type: PositionType::Absolute,
@@ -81,8 +84,8 @@ struct Character {
 }
 
 fn load_gltf(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Load the blender default cube.
-    commands.spawn((
+    // Load the blender scene.
+    /*commands.spawn((
         WorldAssetRoot(
             // SwarmyObjects handle
             asset_server.load(GltfAssetLabel::Scene(0).from_asset("swarmy-objects.gltf")),
@@ -92,7 +95,7 @@ fn load_gltf(mut commands: Commands, asset_server: Res<AssetServer>) {
             y: 2.,
             z: 10.,
         }),
-    ));
+    ));*/
     let gltf = asset_server.load("swarmy-objects.gltf");
     commands.insert_resource(MapScene(gltf));
 }

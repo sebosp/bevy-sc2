@@ -1,0 +1,187 @@
+use crate::CELL_HEIGHT_MULTIPLIER;
+use crate::MAP_SCALE_FACTOR;
+use crate::MapScene;
+use crate::standard_material_from_gltf_material;
+use bevy::gltf::GltfMaterial;
+use bevy::prelude::*;
+
+/// A copy of the T3Terrain that impls Reflect, Resource.
+#[derive(Resource, Default, Reflect, Debug)]
+#[reflect(Resource, Default)]
+pub struct T3TerrainResource {
+    pub version: u32,
+    pub ramp_list: Vec<RampResource>,
+}
+
+/// A copy of the T3Terrain that impls Reflect, Resource.
+#[derive(Resource, Default, Reflect, Debug)]
+#[reflect(Resource, Default)]
+pub struct RampResource {
+    pub dir: u8,
+    /// Looks like cell layer/height
+    pub hi: u8,
+    pub lo: u8,
+    // "u(-1.000000e+00, 0.000000e+00) r(0.000000e+00, 1.000000e+00) c=(1.420000e+02, 4.400000e+01) w=2.000000e+00 h=2.000000e+00"
+    // Looks SVG-ish, maybe u=up r=right c=center w=width h=height ?
+    pub left_lo: String,
+    pub left_hi: String,
+    pub right_lo: String,
+    pub right_hi: String,
+    pub base: String,
+    pub mid: String,
+    pub cid: usize,
+    pub left_lo_var: u32,
+    pub left_hi_var: u32,
+    pub right_lo_var: u32,
+    pub right_hi_var: u32,
+}
+
+impl From<s2protocol::cache_handles::t3_terrain::T3Terrain> for T3TerrainResource {
+    fn from(input: s2protocol::cache_handles::t3_terrain::T3Terrain) -> Self {
+        Self {
+            version: input.version,
+            ramp_list: input
+                .height_map
+                .ramp_list
+                .inner
+                .into_iter()
+                .map(|x| x.into())
+                .collect(),
+        }
+    }
+}
+
+impl From<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
+    fn from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Self {
+        Self {
+            dir: input.dir,
+            hi: input.hi,
+            lo: input.lo,
+            left_lo: input.left_lo,
+            left_hi: input.left_hi,
+            right_lo: input.right_lo,
+            right_hi: input.right_hi,
+            base: input.base,
+            mid: input.mid,
+            cid: input.cid,
+            left_lo_var: input.left_lo_var,
+            left_hi_var: input.left_hi_var,
+            right_lo_var: input.right_lo_var,
+            right_hi_var: input.right_hi_var,
+        }
+    }
+}
+
+/// Loads the t3 height map.
+pub fn load_t3_terrain(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    map_scene: Res<MapScene>,
+    gltf_assets: Res<Assets<Gltf>>,
+    gltf_materials: Res<Assets<GltfMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut loaded: Local<bool>,
+) -> Result<(), BevyError> {
+    // Only do this once
+    if *loaded {
+        return Ok(());
+    }
+    // Wait until the scene is loaded
+    let Some(gltf) = gltf_assets.get(&map_scene.0) else {
+        return Ok(());
+    };
+
+    let source = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27.s2ma".to_string();
+    let (mpq, cache_contents) = s2protocol::read_mpq(&source)?;
+    let t3_terrain_xml =
+        s2protocol::cache_handles::t3_terrain::T3Terrain::from_mpq(&mpq, &cache_contents)?;
+    let mineral_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
+        MAP_SCALE_FACTOR,
+        MAP_SCALE_FACTOR,
+        MAP_SCALE_FACTOR,
+    ))));
+    let xel_naga_mesh = Mesh3d(meshes.add(Cylinder::new(
+        10. * MAP_SCALE_FACTOR,
+        10. * MAP_SCALE_FACTOR,
+    )));
+    let destructible_rock_ex1_diagonal_huge_blur_material_mesh = Mesh3d(meshes.add(Cylinder::new(
+        10. * MAP_SCALE_FACTOR,
+        10. * MAP_SCALE_FACTOR,
+    )));
+    /*
+    // Id="1035" Position="6.0996,150.3146,0" Scale="1,1,1" Type="NoFlyZone" Name="No Fly Zone 011" Color="0,0,0,0" PathingRadiusSoft="5" PathingRadiusHard="4"
+    for ramp in placed_objects.points {
+        // These are objects in the map, decorations, animation references, etc.
+        let unit_pos: Vec<f32> = object_point
+            .position
+            .split(",")
+            .filter_map(|x| x.parse::<f32>().ok())
+            .collect();
+        if unit_pos.len() != 3 {
+            tracing::error!(
+                "Unexpected number of tokens for unit position typed: {}",
+                object_point.kind
+            );
+            continue;
+        }
+        let x = unit_pos[0];
+        let y = unit_pos[1];
+        let z = unit_pos[2];
+        let target_vec_pos = y as usize * t3_height_map_res.width as usize + x as usize;
+        let cell_height = t3_height_map_res.data[target_vec_pos];
+
+        let Some(unit_handle) = gltf.named_materials.get(object_point.kind.as_str()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF named_material ObjectPoint: {}",
+                object_point.kind
+            );
+            continue;
+        };
+        let Some(unit_gltf_material) = gltf_materials.get(unit_handle.id()) else {
+            tracing::warn!(
+                "Unhandled Skein GLTF gltf_material ObjectPoint: {}",
+                object_point.kind
+            );
+            continue;
+        };
+        let object_point_material = MeshMaterial3d(
+            materials.add(standard_material_from_gltf_material(&unit_gltf_material)),
+        );
+        let pathing_radius_soft = object_point.pathing_radius_soft as f32;
+        let _pathing_radius_hard = object_point.pathing_radius_hard as f32;
+        let torus_mesh = Mesh3d(meshes.add(Torus::new(0.2, 0.25)));
+        let cylinder_mesh = Mesh3d(meshes.add(Cylinder::new(
+            pathing_radius_soft * NO_FLY_ZONE_RADIUS * MAP_SCALE_FACTOR,
+            NO_FLY_ZONE_HEIGHT * MAP_SCALE_FACTOR,
+        )));
+        let cylinder_transform = Transform::from_xyz(
+            MAP_SCALE_FACTOR * y,
+            z + cell_height as f32 * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
+            MAP_SCALE_FACTOR * x,
+        );
+        // TODO: We should use the alpha channel, dunno if we need glsl for that tho because it's
+        // being set from blender and exported to gltf.
+        match object_point.kind.as_str() {
+            "NoFlyZone" => commands.spawn((
+                NoFlyZoneMaterial,
+                cylinder_mesh,
+                object_point_material,
+                cylinder_transform,
+            )),
+            "StartLoc" => commands.spawn((
+                StartLocMaterial,
+                torus_mesh,
+                object_point_material,
+                cylinder_transform,
+            )),
+            _ => commands.spawn((
+                UnknownObjectPointMaterial,
+                shadow_platform_ramp_mesh.clone(),
+                cylinder_mesh,
+                cylinder_transform,
+            )),
+        };
+    }*/
+    *loaded = true;
+    Ok(())
+}

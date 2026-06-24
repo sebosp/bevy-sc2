@@ -1,4 +1,4 @@
-use super::t3_height_map::T3HeightMapRes;
+use super::t3_height_map::T3HeightMapResource;
 use crate::CELL_HEIGHT_MULTIPLIER;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
@@ -161,7 +161,7 @@ pub struct StartLocMaterial;
 pub fn load_cache_objects(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    t3_height_map_res: Res<T3HeightMapRes>,
+    t3_height_map_res: Res<T3HeightMapResource>,
     map_scene: Res<MapScene>,
     gltf_assets: Res<Assets<Gltf>>,
     gltf_materials: Res<Assets<GltfMaterial>>,
@@ -177,6 +177,7 @@ pub fn load_cache_objects(
         return Ok(());
     };
 
+    // TODO: Move this to s2protocol
     let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
     let files_content = std::fs::read_to_string(&path)?;
     let placed_objects = serde_xml_rs::from_str::<PlacedObjects>(&files_content)?;
