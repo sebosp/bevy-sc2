@@ -6,7 +6,13 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["free_camera", "jpeg", "dds", "tga"] }
+bevy = { version = "0.19.0", features = [
+    "free_camera",
+    "jpeg",
+    "dds",
+    "tga",
+    "bevy_feathers",
+] }
 bevy_skein = "0.6.0"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
