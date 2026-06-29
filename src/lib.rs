@@ -8,19 +8,14 @@ pub use s2protocol::cache_handles::map::coords::*;
 pub use s2protocol::cache_handles::map_info::*;
 pub use s2protocol::cache_handles::t3_height_map::*;
 
-pub mod t3_height_map;
-pub use t3_height_map::*;
 pub mod cache_objects;
-pub use cache_objects::*;
-pub mod t3_terrain;
-pub use t3_terrain::*;
-
-pub mod swarmy_feathers;
-
 pub mod cli;
-
+pub mod swarmy_feathers;
+pub mod t3_height_map;
+pub mod t3_terrain;
 pub mod utils;
-pub use utils::*;
+
+pub mod map_plugin;
 
 pub const MAP_SCALE_FACTOR: f32 = 0.1;
 

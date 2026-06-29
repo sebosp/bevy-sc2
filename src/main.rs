@@ -5,58 +5,29 @@ use bevy::prelude::*;
 use bevy_skein::SkeinPlugin;
 use clap::Parser;
 use swarmy_bevy::MapScene;
-use swarmy_bevy::SelectedObjectName;
-use swarmy_bevy::cache_objects::*;
 use swarmy_bevy::cli::*;
-use swarmy_bevy::swarmy_feathers::init_feathers;
-use swarmy_bevy::t3_height_map::load_t3_height_map;
-use swarmy_bevy::t3_terrain::load_t3_terrain;
-use swarmy_bevy::utils::*;
-
-#[derive(Default, Reflect, GizmoConfigGroup)]
-pub struct MapPlugin;
-
-impl Plugin for MapPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, MapPlugin::scene.spawn());
-        app.add_systems(Startup, setup_light_and_gizmo_control_text);
-        app.add_systems(Startup, load_t3_height_map);
-        app.add_systems(Update, load_cache_objects);
-        app.add_systems(Update, load_t3_terrain);
-        app.add_systems(Update, update_gizmo_config);
-    }
-}
-impl MapPlugin {
-    fn scene() -> impl SceneList {
-        bsn_list![init_feathers()]
-    }
-}
-
-/// Show some text if there's a current action
-#[derive(Default, Resource, Reflect)]
-pub struct ActivityStage(String);
+use swarmy_bevy::utils;
 
 fn main() {
     let args = Args::parse();
-    // store the name in a resource so we can access it in our systems
-
     let path = args.path.trim_end_matches('/').to_string();
     App::new()
         .insert_resource(CliParams {
             path,
             ids: args.ids,
         })
-        .init_gizmo_group::<MyRoundGizmos>()
+        .init_gizmo_group::<swarmy_bevy::utils::MyRoundGizmos>()
         .add_plugins((
             DefaultPlugins,
             FeathersPlugins,
             SkeinPlugin::default(),
             FreeCameraPlugin,
-            MapPlugin,
+            swarmy_bevy::map_plugin::MapPlugin,
             MeshPickingPlugin,
         ))
         .insert_resource(UiTheme(create_dark_theme()))
         .add_systems(PreStartup, load_gltf)
+        .add_systems(Startup, setup_light_and_gizmo_control_text);
         .run();
 }
 
@@ -70,7 +41,8 @@ fn setup_light_and_gizmo_control_text(mut commands: Commands) {
         Transform::from_xyz(4.0, 8.0, 4.0),
     ));
 
-    // example instructions
+    // basic instructions
+    // However other plugins have more controls, such as F1/F2 for brightness, etc.
     commands.spawn((
         Text::new(
             "Controls:\n\
