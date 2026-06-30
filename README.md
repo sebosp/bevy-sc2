@@ -1,11 +1,10 @@
-# Bevy Starcraft 2 Map viewer.
-
+# Bevy Starcraft 2 Map viewer for the Swarmy project
 
 ## Status
 
 MapInfo, T3 Height Map, Objects (Units such as XelNagaTowers, Doodas, UnitPoints such as StartLocations)
 
-![Bevy window](https://github.com/sebosp/bevy-sc2/blob/main/assets/images/swarmy-bevy-20260624.gif)
+![Bevy window](https://github.com/sebosp/swarby-bevy/blob/main/assets/images/swarmy-bevy-20260624.gif)
 
 The replays are managed via [swarmy](https://github.com/sebosp/swarmy)
 Once a replay path is defined, the caches can be downloaded, the maps listed and the preview from this repo is triggered.
