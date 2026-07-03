@@ -1,11 +1,17 @@
+//! Loads the Object file contained in the MPQ.
+
 use super::t3_height_map::T3HeightMapResource;
-use crate::CELL_HEIGHT_MULTIPLIER;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
 use crate::standard_material_from_gltf_material;
+use crate::swarmy_feathers::DisplayInfoOnClick;
+use crate::swarmy_feathers::update_info_on_click;
+use crate::t3_height_map::CELL_HEIGHT_MULTIPLIER;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+
+pub mod doodas;
 
 // A few Object Units.
 pub const XEL_NAGA_TOWER_HEIGHT: f32 = 25.0;
@@ -13,75 +19,11 @@ pub const XEL_NAGA_TOWER_RADIUS: f32 = 0.5;
 pub const DESTRUCTIBLE_ROCKS_HEIGHT: f32 = 5.0;
 pub const DESTRUCTIBLE_ROCKS_RADIUS: f32 = 5.0;
 
-// Testing a Dooda.
-pub const SHADOW_PLATFORM_RAMP_SIZE: f32 = 1.0;
+pub const UNKNOWN_OBJECT_SIZE: f32 = 1.0;
 
 // Testing Object Points.
 pub const NO_FLY_ZONE_HEIGHT: f32 = 25.0;
 pub const NO_FLY_ZONE_RADIUS: f32 = 0.5;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlacedObjects {
-    #[serde(rename = "@Version")]
-    pub version: u32,
-    #[serde(rename = "ObjectPoint", default)]
-    pub points: Vec<ObjectPoint>,
-    #[serde(rename = "ObjectDoodad", default)]
-    pub doodas: Vec<ObjectDoodad>,
-    #[serde(rename = "ObjectUnit", default)]
-    pub units: Vec<ObjectUnit>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectDoodad {
-    #[serde(rename = "@Id")]
-    pub id: String,
-    #[serde(default, rename = "@Variation")]
-    pub variation: String,
-    #[serde(rename = "@Position")]
-    pub position: String,
-    #[serde(default, rename = "@Rotation")]
-    pub rotation: String,
-    #[serde(rename = "@Scale")]
-    pub scale: String,
-    #[serde(rename = "@Type")]
-    pub kind: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectPoint {
-    #[serde(rename = "@Id")]
-    pub id: String,
-    #[serde(rename = "@Position")]
-    pub position: String,
-    #[serde(rename = "@Scale")]
-    pub scale: String,
-    #[serde(rename = "@Type")]
-    pub kind: String,
-    #[serde(rename = "@Name")]
-    pub name: String,
-    #[serde(rename = "@Color")]
-    pub color: String,
-    #[serde(default, rename = "@PathingRadiusSoft")]
-    pub pathing_radius_soft: u32,
-    #[serde(default, rename = "@PathingRadiusHard")]
-    pub pathing_radius_hard: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectUnit {
-    #[serde(rename = "@Id")]
-    pub id: String,
-    #[serde(default, rename = "@Variation")]
-    pub variation: String,
-    #[serde(rename = "@Position")]
-    pub position: String,
-    #[serde(rename = "@Scale")]
-    pub scale: String,
-    #[serde(rename = "@UnitType")]
-    pub unit_kind: String,
-}
-
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
 #[type_path = "api"]
@@ -131,16 +73,6 @@ pub struct DestructibleRockEx1DiagonalHugeBLURMaterial;
 #[reflect(Component, Default)]
 #[type_path = "api"]
 pub struct UnknownUnit;
-
-#[derive(Component, Default, Reflect, Debug)]
-#[reflect(Component, Default)]
-#[type_path = "api"]
-pub struct ShadowPlatformRampMaterial;
-
-#[derive(Component, Default, Reflect, Debug)]
-#[reflect(Component, Default)]
-#[type_path = "api"]
-pub struct UnknownDoodaMaterial;
 
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
@@ -311,61 +243,11 @@ pub fn load_cache_objects(
             }
         };
     }
-    let shadow_platform_ramp_mesh = Mesh3d(meshes.add(Cuboid::new(
-        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
-        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
-        SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
+    let unknown_object_mesh = Mesh3d(meshes.add(Cuboid::new(
+        UNKNOWN_OBJECT_SIZE * MAP_SCALE_FACTOR,
+        UNKNOWN_OBJECT_SIZE * MAP_SCALE_FACTOR,
+        UNKNOWN_OBJECT_SIZE * MAP_SCALE_FACTOR,
     )));
-    // Id="1231" Position="118.1433,8.0437,6.9763" Scale="1,1,1" Type="Shadow_Platform_Ramp"
-    for dooda in placed_objects.doodas {
-        // These are objects in the map, decorations, animation references, etc.
-        let unit_pos: Vec<f32> = dooda
-            .position
-            .split(",")
-            .filter_map(|x| x.parse::<f32>().ok())
-            .collect();
-        if unit_pos.len() != 3 {
-            tracing::error!(
-                "Unexpected number of tokens for unit position typed: {}",
-                dooda.kind
-            );
-            continue;
-        }
-        let x = unit_pos[0];
-        let y = unit_pos[1];
-
-        let Some(unit_handle) = gltf.named_materials.get(dooda.kind.as_str()) else {
-            tracing::warn!("Unhandled Skein GLTF named_material Dooda: {}", dooda.kind);
-            continue;
-        };
-        let Some(unit_gltf_material) = gltf_materials.get(unit_handle.id()) else {
-            tracing::warn!("Unhandled Skein GLTF gltf_material Dooda: {}", dooda.kind);
-            continue;
-        };
-        let dooda_material = MeshMaterial3d(
-            materials.add(standard_material_from_gltf_material(&unit_gltf_material)),
-        );
-
-        let shadow_platform_ramp_transform = Transform::from_xyz(
-            MAP_SCALE_FACTOR * y,
-            SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
-            MAP_SCALE_FACTOR * x,
-        );
-        match dooda.kind.as_str() {
-            "Shadow_Platform_Ramp" => commands.spawn((
-                ShadowPlatformRampMaterial,
-                shadow_platform_ramp_mesh.clone(),
-                dooda_material,
-                shadow_platform_ramp_transform,
-            )),
-            _ => commands.spawn((
-                UnknownDoodaMaterial,
-                shadow_platform_ramp_mesh.clone(),
-                dooda_material,
-                shadow_platform_ramp_transform,
-            )),
-        };
-    }
     // Id="1035" Position="6.0996,150.3146,0" Scale="1,1,1" Type="NoFlyZone" Name="No Fly Zone 011" Color="0,0,0,0" PathingRadiusSoft="5" PathingRadiusHard="4"
     for object_point in placed_objects.points {
         // These are objects in the map, decorations, animation references, etc.
@@ -433,7 +315,7 @@ pub fn load_cache_objects(
             )),
             _ => commands.spawn((
                 UnknownObjectPointMaterial,
-                shadow_platform_ramp_mesh.clone(),
+                unknown_object_mesh.clone(),
                 cylinder_mesh,
                 cylinder_transform,
             )),

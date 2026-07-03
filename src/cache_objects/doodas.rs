@@ -1,33 +1,18 @@
 //! Doodas defined in the Object file.
 
-use crate::t3_height_map::T3HeightMapResource;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
+use crate::cache_objects::PlacedObjects;
 use crate::standard_material_from_gltf_material;
 use crate::swarmy_feathers::DisplayInfoOnClick;
 use crate::swarmy_feathers::update_info_on_click;
+use crate::t3_height_map::T3HeightMapResource;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Component)]
 pub struct DoodadComponent;
-
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectDoodad {
-    #[serde(rename = "@Id")]
-    pub id: String,
-    #[serde(default, rename = "@Variation")]
-    pub variation: String,
-    #[serde(rename = "@Position")]
-    pub position: String,
-    #[serde(default, rename = "@Rotation")]
-    pub rotation: String,
-    #[serde(rename = "@Scale")]
-    pub scale: String,
-    #[serde(rename = "@Type")]
-    pub kind: String,
-}
 
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
@@ -39,14 +24,13 @@ pub struct ShadowPlatformRampMaterial;
 #[type_path = "api"]
 pub struct UnknownDoodadMaterial;
 
-
 // Testing a Dooda.
 pub const SHADOW_PLATFORM_RAMP_SIZE: f32 = 1.0;
 
 pub fn load_object_doodas(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    t3_height_map_res: Res<T3HeightMapResource>,
+    placed_objects: Res<PlacedObjects>,
     map_scene: Res<MapScene>,
     gltf: &Gltf,
     gltf_materials: Res<Assets<GltfMaterial>>,
