@@ -9,7 +9,6 @@ use crate::swarmy_feathers::update_info_on_click;
 use crate::t3_height_map::CELL_HEIGHT_MULTIPLIER;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
 
 pub mod doodas;
 
@@ -24,6 +23,42 @@ pub const UNKNOWN_OBJECT_SIZE: f32 = 1.0;
 // Testing Object Points.
 pub const NO_FLY_ZONE_HEIGHT: f32 = 25.0;
 pub const NO_FLY_ZONE_RADIUS: f32 = 0.5;
+
+/// A copy of s2protocol PlacedObjects items to use as Bevy Resource
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+pub struct ObjectDoodadResource {
+    pub id: String,
+    pub variation: String,
+    pub position: String,
+    pub rotation: String,
+    pub scale: String,
+    pub kind: String,
+}
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+pub struct ObjectPointResource {
+    pub id: String,
+    pub position: String,
+    pub scale: String,
+    pub kind: String,
+    pub name: String,
+    pub color: String,
+    pub pathing_radius_soft: u32,
+    pub pathing_radius_hard: u32,
+}
+
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+pub struct ObjectUnitResource {
+    pub id: String,
+    pub variation: String,
+    pub position: String,
+    pub scale: String,
+    pub unit_kind: String,
+}
+
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
 #[type_path = "api"]

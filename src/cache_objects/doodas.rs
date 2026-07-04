@@ -2,13 +2,13 @@
 
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
-use crate::cache_objects::PlacedObjects;
 use crate::standard_material_from_gltf_material;
 use crate::swarmy_feathers::DisplayInfoOnClick;
 use crate::swarmy_feathers::update_info_on_click;
 use crate::t3_height_map::T3HeightMapResource;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
+use s2protocol::cache_handles::cache_objects::PlacedObjects;
 use serde::{Deserialize, Serialize};
 
 #[derive(Component)]
