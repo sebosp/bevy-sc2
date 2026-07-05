@@ -10,6 +10,8 @@ pub use s2protocol::cache_handles::t3_height_map::*;
 
 pub mod cache_objects;
 pub mod cli;
+pub mod document_header;
+pub mod map_info;
 pub mod swarmy_feathers;
 pub mod t3_height_map;
 pub mod t3_terrain;
