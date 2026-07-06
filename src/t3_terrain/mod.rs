@@ -1,7 +1,5 @@
-use crate::CELL_HEIGHT_MULTIPLIER;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
-use crate::standard_material_from_gltf_material;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
 
@@ -74,12 +72,12 @@ impl From<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
 
 /// Loads the t3 height map.
 pub fn load_t3_terrain(
-    mut commands: Commands,
+    mut _commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     map_scene: Res<MapScene>,
     gltf_assets: Res<Assets<Gltf>>,
-    gltf_materials: Res<Assets<GltfMaterial>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    _gltf_materials: Res<Assets<GltfMaterial>>,
+    mut _materials: ResMut<Assets<StandardMaterial>>,
     mut loaded: Local<bool>,
 ) -> Result<(), BevyError> {
     // Only do this once
@@ -87,7 +85,7 @@ pub fn load_t3_terrain(
         return Ok(());
     }
     // Wait until the scene is loaded
-    let Some(gltf) = gltf_assets.get(&map_scene.0) else {
+    let Some(_gltf) = gltf_assets.get(&map_scene.0) else {
         return Ok(());
     };
 

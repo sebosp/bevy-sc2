@@ -9,7 +9,7 @@ use bevy::ui::Checked;
 use bevy::ui_widgets::{Activate, ValueChange};
 
 use crate::SelectedObjectName;
-use crate::cache_objects::DoodadComponent;
+use crate::cache_objects::doodas::ObjectDoodadComponent;
 
 /// Allows a component to be observed for click events and show display information on a text feather.
 #[derive(Component)]
@@ -127,7 +127,7 @@ fn main_feather_menu() -> impl Scene {
                             on(|
                                 value_change: On<ValueChange<bool>>,
                                 commands: Commands,
-                                query: Query<Entity, (With<DoodadComponent>, Allow<Disabled>)>, | {
+                                query: Query<Entity, (With<ObjectDoodadComponent>, Allow<Disabled>)>, | {
                                 handle_view_menu_object_doodas_checkbox(value_change, commands, query)
                             })
                         ),
@@ -163,7 +163,7 @@ fn main_feather_menu() -> impl Scene {
 pub fn handle_view_menu_object_doodas_checkbox(
     value_change: On<ValueChange<bool>>,
     mut commands: Commands,
-    query: Query<Entity, (With<DoodadComponent>, Allow<Disabled>)>,
+    query: Query<Entity, (With<ObjectDoodadComponent>, Allow<Disabled>)>,
 ) {
     if value_change.value {
         commands.entity(value_change.source).insert(Checked);

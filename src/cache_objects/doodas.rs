@@ -2,6 +2,7 @@
 
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
+use crate::cache_objects::PlacedObjectsResource;
 use crate::standard_material_from_gltf_material;
 use crate::swarmy_feathers::DisplayInfoOnClick;
 use crate::swarmy_feathers::update_info_on_click;
@@ -11,8 +12,9 @@ use bevy::prelude::*;
 use s2protocol::cache_handles::cache_objects::PlacedObjects;
 use serde::{Deserialize, Serialize};
 
-#[derive(Component)]
-pub struct DoodadComponent;
+#[derive(Component, Default, Reflect, Debug)]
+#[reflect(Component, Default)]
+pub struct ObjectDoodadComponent;
 
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
@@ -30,12 +32,15 @@ pub const SHADOW_PLATFORM_RAMP_SIZE: f32 = 1.0;
 pub fn load_object_doodas(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    placed_objects: Res<PlacedObjects>,
+    placed_objects: Res<PlacedObjectsResource>,
     map_scene: Res<MapScene>,
-    gltf: &Gltf,
+    gltf_assets: Res<Assets<Gltf>>,
     gltf_materials: Res<Assets<GltfMaterial>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let Some(gltf) = gltf_assets.get(&map_scene.0) else {
+        return;
+    };
     // An example doodad name observed in the Objects file.
     let shadow_platform_ramp_mesh = Mesh3d(meshes.add(Cuboid::new(
         SHADOW_PLATFORM_RAMP_SIZE * MAP_SCALE_FACTOR,
@@ -89,10 +94,9 @@ pub fn load_object_doodas(
             "Shadow_Platform_Ramp" => commands
                 .spawn((
                     ShadowPlatformRampMaterial,
-                    DoodadComponent,
+                    ObjectDoodadComponent,
                     DisplayInfoOnClick,
                     Name(format!("{}:{}:{}", doodad.kind, doodad.id, doodad_ith).into()),
-                    doodad.clone(),
                     shadow_platform_ramp_mesh.clone(),
                     dooda_material,
                     shadow_platform_ramp_transform,
@@ -101,10 +105,9 @@ pub fn load_object_doodas(
             _ => commands
                 .spawn((
                     UnknownDoodadMaterial,
-                    DoodadComponent,
+                    ObjectDoodadComponent,
                     DisplayInfoOnClick,
                     Name(format!("{}:{}:{}", doodad.kind, doodad.id, doodad_ith).into()),
-                    doodad.clone(),
                     unknown_object_mesh.clone(),
                     dooda_material,
                     shadow_platform_ramp_transform,

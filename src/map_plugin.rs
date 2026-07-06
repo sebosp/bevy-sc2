@@ -1,11 +1,18 @@
 //! The main Map Bevy Plugin
 use bevy::prelude::*;
-use s2protocol::cache_handles::map_info::MapInfo;
+use s2protocol::cache_handles::DOCUMENT_HEADER_FILE_NAME;
+use s2protocol::cache_handles::MAP_INFO_FILE_NAME;
+use s2protocol::cache_handles::T3_HEIGHT_MAP_FILE_NAME;
 
 use crate::cache_objects;
+use crate::cache_objects::PlacedObjectsResource;
+use crate::cli::CliParams;
 use crate::swarmy_feathers;
 use crate::t3_height_map;
+use crate::t3_height_map::MapDimension;
+use crate::t3_height_map::T3HeightMapResource;
 use crate::t3_terrain;
+use crate::t3_terrain::T3TerrainResource;
 use crate::utils;
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -13,6 +20,7 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(PreStartup, load_cache_depot_map_resources);
         app.add_systems(Startup, MapPlugin::scene.spawn());
         app.add_systems(Startup, t3_height_map::load_t3_height_map);
         app.add_systems(Startup, cache_objects::doodas::load_object_doodas);
@@ -27,8 +35,25 @@ impl MapPlugin {
     }
 }
 
+/// Contains errors to be displayed as Feathers when unable to find info in the cache depots, serde
+/// issues, etc.
+#[derive(Component, Default, Reflect, Debug, Clone)]
+pub struct MapPluginError {
+    pub kind: String,
+    pub err: String,
+}
+
+impl MapPluginError {
+    fn new(kind: &'static str, err: impl ToString) -> Self {
+        Self {
+            kind: kind.to_string(),
+            err: err.to_string(),
+        }
+    }
+}
+
 /// A resource mirror of s2protocol::cache_handles::map_info::MapInfo
-#[derive(Resource, Default, Reflect, Debug, Default, Debug, Clone)]
+#[derive(Resource, Default, Reflect, Debug, Clone)]
 pub struct MapInfoResource {
     pub file_version: i32,
     pub cell_width: usize,
@@ -45,28 +70,31 @@ pub struct MapInfoResource {
     pub cell_bottom: usize,
     pub cell_right: usize,
     pub cell_top: usize,
+    pub playable_dimensions: MapDimension,
 }
 
-impl From<MapInfo> for MapInfoResource {
-    pub fn from(src: MapInfo) -> Self {
+impl From<s2protocol::cache_handles::map_info::MapInfo> for MapInfoResource {
+    fn from(src: s2protocol::cache_handles::map_info::MapInfo) -> Self {
+        let playable_dimensions = MapDimension::from(src.cell_dim_playable());
         Self {
-            file_version,
-            cell_width,
-            cell_height,
-            first_string,
-            second_string,
-            third_string,
-            fourth_string,
-            cell_left,
-            cell_bottom,
-            cell_right,
-            cell_top,
+            file_version: src.file_version,
+            cell_width: src.cell_width,
+            cell_height: src.cell_height,
+            first_string: src.first_string,
+            second_string: src.second_string,
+            third_string: src.third_string,
+            fourth_string: src.fourth_string,
+            cell_left: src.cell_left,
+            cell_bottom: src.cell_bottom,
+            cell_right: src.cell_right,
+            cell_top: src.cell_top,
+            playable_dimensions,
         }
     }
 }
 
 /// A resource mirror of s2protocol::cache_handles::document_header::DocumentHeader
-#[derive(Resource, Default, Reflect, Debug, Default, Debug, Clone)]
+#[derive(Resource, Reflect, Debug, Default, Clone)]
 pub struct DocumentHeaderResource {
     pub maybe_dimension_x1: i32,
     pub maybe_dimension_y1: i32,
@@ -81,4 +109,130 @@ pub struct DocumentHeaderResource {
     pub description_long: String,
     /// A short description of the map, in the few files I've checked it's empty.
     pub description_short: String,
+}
+
+impl From<s2protocol::cache_handles::document_header::DocumentHeader> for DocumentHeaderResource {
+    fn from(src: s2protocol::cache_handles::document_header::DocumentHeader) -> Self {
+        Self {
+            maybe_dimension_x1: src.maybe_dimension_x1,
+            maybe_dimension_y1: src.maybe_dimension_y1,
+            some_epoch_1: src.some_epoch_1,
+            some_epoch_2: src.some_epoch_2,
+            mod_info: src.mod_info,
+            name: src.name,
+            description_long: src.description_long,
+            description_short: src.description_short,
+        }
+    }
+}
+
+/// Attempts to load the available resources from the downloaded caches.
+pub fn load_cache_depot_map_resources(mut commands: Commands, cli_params: Res<CliParams>) {
+    let cache_collection = s2protocol::cache_handles::CacheCollection::new(
+        cli_params.path.clone(),
+        cli_params.ids.clone(),
+    );
+    match cache_collection.load_t3_height_map() {
+        Ok(t3_height_map) => {
+            let max_map_dim = t3_height_map.width.max(t3_height_map.height);
+            let mut cell_x_y_data: Vec<u8> = Vec::with_capacity(max_map_dim * max_map_dim);
+            for _ in 0..(max_map_dim * max_map_dim) {
+                cell_x_y_data.push(0);
+            }
+            for (idx, cell_height) in t3_height_map.data.iter().enumerate() {
+                let x = usize::try_from(
+                    (t3_height_map.width as i32 - idx as i32).abs() % t3_height_map.width as i32,
+                )
+                .unwrap();
+                let y = usize::try_from(
+                    (t3_height_map.width as i32 - idx as i32).abs() / t3_height_map.width as i32,
+                )
+                .unwrap();
+                let target_vec_pos = y as usize * t3_height_map.width as usize + x as usize;
+                cell_x_y_data[target_vec_pos] = *cell_height;
+            }
+            let t3_height_map_res = T3HeightMapResource {
+                data: cell_x_y_data,
+                width: t3_height_map.width as usize,
+                height: t3_height_map.height as usize,
+            };
+            commands.insert_resource(t3_height_map_res);
+        }
+        Err(err) => {
+            error!(
+                "Unable to find '{}' embedded in the cache handles directory: {}: {}",
+                T3_HEIGHT_MAP_FILE_NAME,
+                cli_params.path,
+                err.to_string(),
+            );
+            commands.spawn(MapPluginError::new("load_t3_height_map", err));
+        }
+    }
+    match cache_collection.load_map_info() {
+        Ok(val) => {
+            let map_info_res = MapInfoResource::from(val);
+            commands.insert_resource(map_info_res);
+        }
+        Err(err) => {
+            tracing::error!(
+                "Unable to locate '{}' in the cache handles provided: {:?}",
+                MAP_INFO_FILE_NAME,
+                err
+            );
+            commands.spawn(MapPluginError::new("load_map_info", err));
+        }
+    }
+    match cache_collection.load_document_header() {
+        Ok(mut document_header) => {
+            tracing::info!("docu header: {:?}", document_header);
+
+            // Remove double new lines to save space in the UI.
+            let line_len = 80usize;
+            let mut desc_lines: Vec<String> = vec![];
+            document_header.description_long =
+                document_header.description_long.replace("<n/><n/>", "<n/>");
+            let chunks = document_header.description_long.split(" ");
+            let mut curr_str = String::from("");
+            for chunk in chunks {
+                if curr_str.len() < line_len {
+                    curr_str.push_str(" ");
+                    curr_str.push_str(chunk);
+                } else {
+                    desc_lines.push(curr_str.replace("<n/>", "\n"));
+                    curr_str = chunk.to_string();
+                }
+            }
+
+            desc_lines.push(curr_str.replace("<n/>", "\n"));
+            document_header.description_long = desc_lines.join("\n");
+            if let Ok(t3_terrain) = cache_collection.load_t3_terrain() {
+                let t3_terrain = T3TerrainResource::from(t3_terrain);
+                commands.insert_resource(t3_terrain);
+            }
+            let document_header_res = DocumentHeaderResource::from(document_header);
+            commands.insert_resource(document_header_res);
+        }
+        Err(err) => {
+            tracing::error!(
+                "Unable to locate '{}' in the cache handles provided: {:?}",
+                DOCUMENT_HEADER_FILE_NAME,
+                err
+            );
+            commands.spawn(MapPluginError::new("load_document_header", err));
+        }
+    }
+    match cache_collection.load_objects() {
+        Ok(placed_objects) => {
+            tracing::info!("docu header: {:?}", placed_objects);
+            let placed_obj_res: PlacedObjectsResource = placed_objects.into();
+            commands.insert_resource(placed_obj_res);
+        }
+        Err(err) => {
+            tracing::error!(
+                "Unable to locate DocumentHeader in the cache handles provided: {:?}",
+                err
+            );
+            commands.spawn(MapPluginError::new("load_document_header", err));
+        }
+    }
 }

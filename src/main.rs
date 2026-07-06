@@ -27,7 +27,7 @@ fn main() {
         ))
         .insert_resource(UiTheme(create_dark_theme()))
         .add_systems(PreStartup, load_gltf)
-        .add_systems(Startup, setup_light_and_gizmo_control_text);
+        .add_systems(Startup, setup_light_and_gizmo_control_text)
         .run();
 }
 

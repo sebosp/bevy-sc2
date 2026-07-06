@@ -3,6 +3,7 @@
 use super::t3_height_map::T3HeightMapResource;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
+use crate::cache_objects::doodas::ObjectDoodadComponent;
 use crate::standard_material_from_gltf_material;
 use crate::swarmy_feathers::DisplayInfoOnClick;
 use crate::swarmy_feathers::update_info_on_click;
@@ -24,10 +25,31 @@ pub const UNKNOWN_OBJECT_SIZE: f32 = 1.0;
 pub const NO_FLY_ZONE_HEIGHT: f32 = 25.0;
 pub const NO_FLY_ZONE_RADIUS: f32 = 0.5;
 
-/// A copy of s2protocol PlacedObjects items to use as Bevy Resource
-#[derive(Component, Default, Reflect, Debug)]
-#[reflect(Component, Default)]
-pub struct ObjectDoodadResource {
+/// A resources that contains the Objects XML file contents mirror copy for Bevy.
+#[derive(Resource, Default, Reflect, Debug)]
+#[reflect(Resource, Default)]
+pub struct PlacedObjectsResource {
+    pub version: u32,
+    pub points: Vec<ObjectPoint>,
+    pub doodas: Vec<ObjectDoodad>,
+    pub units: Vec<ObjectUnit>,
+}
+
+impl From<s2protocol::cache_handles::cache_objects::PlacedObjects> for PlacedObjectsResource {
+    fn from(src: s2protocol::cache_handles::cache_objects::PlacedObjects) -> PlacedObjectsResource {
+        PlacedObjectsResource {
+            version: src.version,
+            points: src.points.into_iter().map(|x| x.into()).collect(),
+            doodas: src.doodas.into_iter().map(|x| x.into()).collect(),
+            units: src.units.into_iter().map(|x| x.into()).collect(),
+        }
+    }
+}
+
+/// A copy of the Doodad Object for Reflect, etc.
+#[derive(Default, Reflect, Debug)]
+#[reflect(Default)]
+pub struct ObjectDoodad {
     pub id: String,
     pub variation: String,
     pub position: String,
@@ -36,9 +58,22 @@ pub struct ObjectDoodadResource {
     pub kind: String,
 }
 
-#[derive(Component, Default, Reflect, Debug)]
-#[reflect(Component, Default)]
-pub struct ObjectPointResource {
+impl From<s2protocol::cache_handles::cache_objects::ObjectDoodad> for ObjectDoodad {
+    fn from(src: s2protocol::cache_handles::cache_objects::ObjectDoodad) -> ObjectDoodad {
+        ObjectDoodad {
+            id: src.id,
+            variation: src.variation,
+            position: src.position,
+            rotation: src.rotation,
+            scale: src.scale,
+            kind: src.kind,
+        }
+    }
+}
+
+#[derive(Default, Reflect, Debug)]
+#[reflect(Default)]
+pub struct ObjectPoint {
     pub id: String,
     pub position: String,
     pub scale: String,
@@ -49,14 +84,41 @@ pub struct ObjectPointResource {
     pub pathing_radius_hard: u32,
 }
 
+impl From<s2protocol::cache_handles::cache_objects::ObjectPoint> for ObjectPoint {
+    fn from(src: s2protocol::cache_handles::cache_objects::ObjectPoint) -> ObjectPoint {
+        ObjectPoint {
+            id: src.id,
+            position: src.position,
+            scale: src.scale,
+            kind: src.kind,
+            name: src.name,
+            color: src.color,
+            pathing_radius_soft: src.pathing_radius_soft,
+            pathing_radius_hard: src.pathing_radius_hard,
+        }
+    }
+}
+
 #[derive(Component, Default, Reflect, Debug)]
 #[reflect(Component, Default)]
-pub struct ObjectUnitResource {
+pub struct ObjectUnit {
     pub id: String,
     pub variation: String,
     pub position: String,
     pub scale: String,
     pub unit_kind: String,
+}
+
+impl From<s2protocol::cache_handles::cache_objects::ObjectUnit> for ObjectUnit {
+    fn from(src: s2protocol::cache_handles::cache_objects::ObjectUnit) -> ObjectUnit {
+        ObjectUnit {
+            id: src.id,
+            variation: src.variation,
+            position: src.position,
+            scale: src.scale,
+            unit_kind: src.unit_kind,
+        }
+    }
 }
 
 #[derive(Component, Default, Reflect, Debug)]
@@ -133,6 +195,7 @@ pub fn load_cache_objects(
     gltf_assets: Res<Assets<Gltf>>,
     gltf_materials: Res<Assets<GltfMaterial>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    placed_objects: Res<PlacedObjectsResource>,
     mut loaded: Local<bool>,
 ) -> Result<(), BevyError> {
     // Only do this once
@@ -144,10 +207,6 @@ pub fn load_cache_objects(
         return Ok(());
     };
 
-    // TODO: Move this to s2protocol
-    let path = "/home/seb/SC2Replays/swarmy/extract/a76deb95741e1d3d24527f0a303914824455bc9d68411fa143d23cc4edee9c27/Objects".to_string();
-    let files_content = std::fs::read_to_string(&path)?;
-    let placed_objects = serde_xml_rs::from_str::<PlacedObjects>(&files_content)?;
     let mineral_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
         MAP_SCALE_FACTOR,
         MAP_SCALE_FACTOR,
@@ -161,7 +220,7 @@ pub fn load_cache_objects(
         DESTRUCTIBLE_ROCKS_RADIUS * MAP_SCALE_FACTOR,
         DESTRUCTIBLE_ROCKS_HEIGHT * MAP_SCALE_FACTOR,
     )));
-    for unit in placed_objects.units {
+    for unit in &placed_objects.units {
         tracing::info!("{:?}", unit);
         // ObjectUnit { id: "209", variation: "8", position: "97,102.5,0", scale: "1,1,1", unit_kind: "RichMineralField" }
         let unit_pos: Vec<f32> = unit
@@ -284,7 +343,7 @@ pub fn load_cache_objects(
         UNKNOWN_OBJECT_SIZE * MAP_SCALE_FACTOR,
     )));
     // Id="1035" Position="6.0996,150.3146,0" Scale="1,1,1" Type="NoFlyZone" Name="No Fly Zone 011" Color="0,0,0,0" PathingRadiusSoft="5" PathingRadiusHard="4"
-    for object_point in placed_objects.points {
+    for object_point in &placed_objects.points {
         // These are objects in the map, decorations, animation references, etc.
         let unit_pos: Vec<f32> = object_point
             .position
