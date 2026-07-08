@@ -1,7 +1,11 @@
+use crate::BevySC2MapError;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
+use nom::IResult;
+use nom::bytes::complete::tag;
+use nom::bytes::complete::take_until;
 
 /// A copy of the T3Terrain that impls Reflect, Resource.
 #[derive(Resource, Default, Reflect, Debug)]
@@ -11,17 +15,50 @@ pub struct T3TerrainResource {
     pub ramp_list: Vec<RampResource>,
 }
 
+#[derive(Resource, Default, Reflect, Debug)]
+#[reflect(Resource, Default)]
+pub enum RampDirection {
+    #[default]
+    South,
+    North,
+    West,
+    East,
+    SouthWest,
+    SouthEast,
+    NorthWest,
+    NorthEast,
+}
+
+impl TryFrom<u8> for RampDirection {
+    type Error = BevySC2MapError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::South),
+            1 => Ok(Self::North),
+            2 => Ok(Self::West),
+            3 => Ok(Self::East),
+            4 => Ok(Self::SouthWest),
+            5 => Ok(Self::SouthEast),
+            6 => Ok(Self::NorthWest),
+            7 => Ok(Self::NorthEast),
+            _ => Err(BevySC2MapError::Other(
+                "Unknown Ramp Direction.".to_string(),
+            )),
+        }
+    }
+}
+
 /// A copy of the T3Terrain that impls Reflect, Resource.
 #[derive(Resource, Default, Reflect, Debug)]
 #[reflect(Resource, Default)]
 pub struct RampResource {
-    pub dir: u8,
+    pub dir: RampDirection,
     /// Looks like cell layer/height
     pub hi: u8,
     pub lo: u8,
     // "u(-1.000000e+00, 0.000000e+00) r(0.000000e+00, 1.000000e+00) c=(1.420000e+02, 4.400000e+01) w=2.000000e+00 h=2.000000e+00"
     // Looks SVG-ish, maybe u=up r=right c=center w=width h=height ?
-    pub left_lo: String,
+    pub left_lo: Vec2,
     pub left_hi: String,
     pub right_lo: String,
     pub right_hi: String,
@@ -34,28 +71,34 @@ pub struct RampResource {
     pub right_hi_var: u32,
 }
 
-impl From<s2protocol::cache_handles::t3_terrain::T3Terrain> for T3TerrainResource {
-    fn from(input: s2protocol::cache_handles::t3_terrain::T3Terrain) -> Self {
-        Self {
+impl TryFrom<s2protocol::cache_handles::t3_terrain::T3Terrain> for T3TerrainResource {
+    type Error = BevySC2MapError;
+    fn try_from(
+        input: s2protocol::cache_handles::t3_terrain::T3Terrain,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
             version: input.version,
             ramp_list: input
                 .height_map
                 .ramp_list
                 .inner
                 .into_iter()
-                .map(|x| x.into())
+                .filter_map(|x| x.try_into().ok())
                 .collect(),
-        }
+        })
     }
 }
 
-impl From<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
-    fn from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Self {
-        Self {
-            dir: input.dir,
+impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
+    type Error = BevySC2MapError;
+    fn try_from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Result<Self, Self::Error> {
+        let (_, (left_lo_str_x, left_lo_str_y)) = parse_c_x_y(&input.left_lo)?;
+        let (_, left_lo) = c_x_y_to_vec2(left_lo_str_x, left_lo_str_y)?;
+        Ok(Self {
+            dir: input.dir.try_into()?,
             hi: input.hi,
             lo: input.lo,
-            left_lo: input.left_lo,
+            left_lo: left_lo,
             left_hi: input.left_hi,
             right_lo: input.right_lo,
             right_hi: input.right_hi,
@@ -66,8 +109,24 @@ impl From<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
             left_hi_var: input.left_hi_var,
             right_lo_var: input.right_lo_var,
             right_hi_var: input.right_hi_var,
-        }
+        })
     }
+}
+
+/// The Ramp contains x,y inside c=(x,y)
+/// u(0.000000e+00, -1.000000e+00) r(-1.000000e+00, 0.000000e+00) c=(4.800000e+01, 2.600000e+01) w=2.000000e+00 h=2.000000e+00
+/// There are maybe 10 maybe 100 ramps per maps and it's only read once, maybe String is fine by now.
+fn parse_c_x_y(s: &str) -> IResult<&str, (String, String)> {
+    let (tail, _) = take_until("c=(")(s)?;
+    let (tail, _) = tag("c=(")(tail)?;
+    let (tail, x) = take_until(", ")(tail)?;
+    let (tail, _) = tag(", ")(tail)?;
+    let (tail, y) = take_until(") ")(tail)?;
+    Ok((tail, (x.to_string(), y.to_string())))
+}
+
+fn c_x_y_to_vec2(x_str: String, y_str: String) -> Result<Vec2, BevySC2MapError> {
+    Ok(Vec2::new(x_str.parse()?, y_str.parse()?))
 }
 
 /// Loads the t3 height map.
