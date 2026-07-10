@@ -205,9 +205,10 @@ pub fn load_cache_depot_map_resources(mut commands: Commands, cli_params: Res<Cl
 
             desc_lines.push(curr_str.replace("<n/>", "\n"));
             document_header.description_long = desc_lines.join("\n");
-            if let Ok(t3_terrain) = cache_collection.load_t3_terrain() {
-                let t3_terrain = T3TerrainResource::from(t3_terrain);
-                commands.insert_resource(t3_terrain);
+            if let Ok(t3_terrain) = cache_collection.load_t3_terrain()
+                && let Ok(t3_terrain_res) = T3TerrainResource::try_from(t3_terrain)
+            {
+                commands.insert_resource(t3_terrain_res);
             }
             let document_header_res = DocumentHeaderResource::from(document_header);
             commands.insert_resource(document_header_res);

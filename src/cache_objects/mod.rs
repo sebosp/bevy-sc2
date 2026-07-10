@@ -3,10 +3,7 @@
 use super::t3_height_map::T3HeightMapResource;
 use crate::MAP_SCALE_FACTOR;
 use crate::MapScene;
-use crate::cache_objects::doodas::ObjectDoodadComponent;
 use crate::standard_material_from_gltf_material;
-use crate::swarmy_feathers::DisplayInfoOnClick;
-use crate::swarmy_feathers::update_info_on_click;
 use crate::t3_height_map::CELL_HEIGHT_MULTIPLIER;
 use bevy::gltf::GltfMaterial;
 use bevy::prelude::*;
