@@ -97,6 +97,7 @@ impl TryFrom<s2protocol::cache_handles::t3_terrain::T3Terrain> for T3TerrainReso
 impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
     type Error = BevySC2MapError;
     fn try_from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Result<Self, Self::Error> {
+        tracing::info!("try_from ramp: {:?}", input);
         let left_lo = parse_c_x_y(&input.left_lo)?;
         let left_hi = parse_c_x_y(&input.left_hi)?;
         let right_lo = parse_c_x_y(&input.right_lo)?;
@@ -143,32 +144,66 @@ pub fn load_t3_terrain(
     t3_height_map_res: Res<T3HeightMapResource>,
     t3_terrain: ResMut<T3TerrainResource>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut loaded: Local<bool>,
 ) {
+    if *loaded {
+        return;
+    }
+    *loaded = true;
     for (ramp_ith, ramp) in t3_terrain.ramp_list.iter().enumerate() {
-        let left_lo_x = ramp.left_lo.x;
-        let left_lo_y = ramp.left_lo.y;
-        let right_lo_x = ramp.right_lo.x;
-        let right_lo_y = ramp.right_lo.y;
+        // low
+        let left_lo_x = ramp.left_lo.x * MAP_SCALE_FACTOR;
+        let left_lo_y = ramp.left_lo.y * MAP_SCALE_FACTOR;
+        let right_lo_x = ramp.right_lo.x * MAP_SCALE_FACTOR;
+        let right_lo_y = ramp.right_lo.y * MAP_SCALE_FACTOR;
 
-        // Find the height for the ramp points.
-        // I guess these two should be the same since they are "lo"?
+        // high
+        let left_hi_x = ramp.left_hi.x * MAP_SCALE_FACTOR;
+        let left_hi_y = ramp.left_hi.y * MAP_SCALE_FACTOR;
+        let right_hi_x = ramp.right_hi.x * MAP_SCALE_FACTOR;
+        let right_hi_y = ramp.right_hi.y * MAP_SCALE_FACTOR;
+
+        // Find the height position in the t3_height_map_res xy vector
+        // I guess these two should be the same since they are "lo"/"hi"?
+        // low
         let left_lo_target_vec_pos =
-            left_lo_y as usize * t3_height_map_res.width as usize + left_lo_x as usize;
+            ramp.left_lo.y as usize * t3_height_map_res.width as usize + ramp.left_lo.x as usize;
         let right_lo_target_vec_pos =
-            left_lo_y as usize * t3_height_map_res.width as usize + left_lo_x as usize;
+            ramp.right_lo.y as usize * t3_height_map_res.width as usize + ramp.right_lo.x as usize;
+        // high
+        let left_hi_target_vec_pos =
+            ramp.left_hi.y as usize * t3_height_map_res.width as usize + ramp.left_hi.x as usize;
+        let right_hi_target_vec_pos =
+            ramp.right_hi.y as usize * t3_height_map_res.width as usize + ramp.right_hi.x as usize;
 
-        let left_lo_cell_height = t3_height_map_res.data[left_lo_target_vec_pos];
-        let right_lo_cell_height = t3_height_map_res.data[right_lo_target_vec_pos];
-        let left_lo_transform = Transform::from_xyz(
-            MAP_SCALE_FACTOR * left_lo_y,
-            (left_lo_cell_height as f32 - 0.35) * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
-            MAP_SCALE_FACTOR * left_lo_x,
-        );
-        let right_lo_transform = Transform::from_xyz(
-            MAP_SCALE_FACTOR * right_lo_y,
-            (right_lo_cell_height as f32 - 0.35) * CELL_HEIGHT_MULTIPLIER * MAP_SCALE_FACTOR,
-            MAP_SCALE_FACTOR * right_lo_x,
-        );
+        // Our height calculation is off by a bit somewhere....
+        let left_lo_cell_height =
+            (t3_height_map_res.data[left_lo_target_vec_pos] as f32 * MAP_SCALE_FACTOR - 0.01)
+                * CELL_HEIGHT_MULTIPLIER;
+        let right_lo_cell_height =
+            (t3_height_map_res.data[right_lo_target_vec_pos] as f32 * MAP_SCALE_FACTOR - 0.01)
+                * CELL_HEIGHT_MULTIPLIER;
+        let left_hi_cell_height =
+            (t3_height_map_res.data[left_hi_target_vec_pos] as f32 * MAP_SCALE_FACTOR - 0.01)
+                * CELL_HEIGHT_MULTIPLIER;
+        let right_hi_cell_height =
+            (t3_height_map_res.data[right_hi_target_vec_pos] as f32 * MAP_SCALE_FACTOR - 0.01)
+                * CELL_HEIGHT_MULTIPLIER;
+
+        // Create Vec3 points for each of the 4 corners of the ramp.
+        // Polyline3d points
+        let left_lo: Vec3 = Vec3::new(0., 0., 0.);
+        let right_lo: Vec3 = Vec3::new(left_lo_y - right_lo_y, 0., left_lo_x - right_lo_x);
+
+        let left_hi: Vec3 = Vec3::new(0., 0., 0.);
+        let right_hi: Vec3 = Vec3::new(left_hi_y - right_hi_y, 0., left_hi_x - right_hi_x);
+
+        let left_lo_transform = Transform::from_xyz(left_lo_y, left_lo_cell_height, left_lo_x);
+        let right_lo_transform = Transform::from_xyz(right_lo_y, right_lo_cell_height, right_lo_x);
+
+        let left_hi_transform = Transform::from_xyz(left_hi_y, left_hi_cell_height, left_hi_x);
+        let right_hi_transform = Transform::from_xyz(right_hi_y, right_hi_cell_height, right_hi_x);
+
         let ramp_mesh = Mesh3d(meshes.add(Cuboid::from_size(Vec3::new(
             MAP_SCALE_FACTOR,
             RAMP_HEIGHT * MAP_SCALE_FACTOR,
@@ -186,9 +221,47 @@ pub fn load_t3_terrain(
         commands
             .spawn((
                 DisplayInfoOnClick,
-                Name(format!("left_lo: {}", ramp_ith).into()),
+                Name(format!("right_lo: {}", ramp_ith).into()),
                 right_lo_transform,
+                ramp_mesh.clone(),
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::GREEN_600))),
+            ))
+            .observe(update_info_on_click);
+        commands
+            .spawn((
+                DisplayInfoOnClick,
+                Name(format!("left_hi: {}", ramp_ith).into()),
+                left_hi_transform,
+                ramp_mesh.clone(),
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::RED_600))),
+            ))
+            .observe(update_info_on_click);
+        commands
+            .spawn((
+                DisplayInfoOnClick,
+                Name(format!("right_hi: {}", ramp_ith).into()),
+                right_hi_transform,
                 ramp_mesh,
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::GREEN_600))),
+            ))
+            .observe(update_info_on_click);
+        commands
+            .spawn((
+                DisplayInfoOnClick,
+                Name(format!("lo_ramp: {}", ramp_ith).into()),
+                //Mesh3d(meshes.add(Segment3d::new(left_lo, right_lo))),
+                right_lo_transform,
+                Mesh3d(meshes.add(Polyline3d::new([right_lo, left_lo]))),
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::RED_600))),
+            ))
+            .observe(update_info_on_click);
+        commands
+            .spawn((
+                DisplayInfoOnClick,
+                Name(format!("hi_ramp: {}", ramp_ith).into()),
+                //Mesh3d(meshes.add(Segment3d::new(left_hi, right_hi))),
+                right_hi_transform,
+                Mesh3d(meshes.add(Polyline3d::new([right_hi, left_hi]))),
                 MeshMaterial3d(materials.add(Color::from(palettes::tailwind::RED_600))),
             ))
             .observe(update_info_on_click);

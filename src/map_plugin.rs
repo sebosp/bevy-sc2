@@ -184,7 +184,7 @@ pub fn load_cache_depot_map_resources(mut commands: Commands, cli_params: Res<Cl
     }
     match cache_collection.load_document_header() {
         Ok(mut document_header) => {
-            tracing::info!("docu header: {:?}", document_header);
+            tracing::debug!("docu header: {:?}", document_header);
 
             // Remove double new lines to save space in the UI.
             let line_len = 80usize;
@@ -224,7 +224,7 @@ pub fn load_cache_depot_map_resources(mut commands: Commands, cli_params: Res<Cl
     }
     match cache_collection.load_objects() {
         Ok(placed_objects) => {
-            tracing::info!("docu header: {:?}", placed_objects);
+            tracing::debug!("docu header: {:?}", placed_objects);
             let placed_obj_res: PlacedObjectsResource = placed_objects.into();
             commands.insert_resource(placed_obj_res);
         }
