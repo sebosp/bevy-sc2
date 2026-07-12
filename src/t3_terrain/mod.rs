@@ -97,12 +97,17 @@ impl TryFrom<s2protocol::cache_handles::t3_terrain::T3Terrain> for T3TerrainReso
 impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
     type Error = BevySC2MapError;
     fn try_from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Result<Self, Self::Error> {
-        tracing::info!("try_from ramp: {:?}", input);
+        // The "hi" units seem to be relative to the "lo" absolute points in the cell grid.
         let left_lo = parse_c_x_y(&input.left_lo)?;
-        let left_hi = parse_c_x_y(&input.left_hi)?;
+        let mut left_hi = parse_c_x_y(&input.left_hi)?;
+        left_hi.x = left_lo.x - left_hi.x;
+        left_hi.y = left_lo.y - left_hi.y;
+
         let right_lo = parse_c_x_y(&input.right_lo)?;
-        let right_hi = parse_c_x_y(&input.right_hi)?;
-        Ok(Self {
+        let mut right_hi = parse_c_x_y(&input.right_hi)?;
+        right_hi.x = right_lo.x - right_hi.x;
+        right_hi.y = right_lo.y - right_hi.y;
+        let res = Self {
             dir: input.dir.try_into()?,
             hi: input.hi,
             lo: input.lo,
@@ -110,14 +115,17 @@ impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
             left_hi: left_hi,
             right_lo: right_lo,
             right_hi: right_hi,
-            base: input.base,
-            mid: input.mid,
+            base: input.base.clone(),
+            mid: input.mid.clone(),
             cid: input.cid,
             left_lo_var: input.left_lo_var,
             left_hi_var: input.left_hi_var,
             right_lo_var: input.right_lo_var,
             right_hi_var: input.right_hi_var,
-        })
+        };
+        tracing::info!("try_from: input: {input:?}, output: {res:?}",);
+
+        Ok(res)
     }
 }
 
@@ -233,7 +241,7 @@ pub fn load_t3_terrain(
                 Name(format!("left_hi: {}", ramp_ith).into()),
                 left_hi_transform,
                 ramp_mesh.clone(),
-                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::RED_600))),
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::ORANGE_600))),
             ))
             .observe(update_info_on_click);
         commands
@@ -242,7 +250,7 @@ pub fn load_t3_terrain(
                 Name(format!("right_hi: {}", ramp_ith).into()),
                 right_hi_transform,
                 ramp_mesh,
-                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::GREEN_600))),
+                MeshMaterial3d(materials.add(Color::from(palettes::tailwind::LIME_600))),
             ))
             .observe(update_info_on_click);
         commands
