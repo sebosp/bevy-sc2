@@ -98,13 +98,13 @@ impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
     type Error = BevySC2MapError;
     fn try_from(input: s2protocol::cache_handles::t3_terrain::Ramp) -> Result<Self, Self::Error> {
         // The "hi" units seem to be relative to the "lo" absolute points in the cell grid.
-        let left_lo = parse_c_x_y(&input.left_lo)?;
-        let mut left_hi = parse_c_x_y(&input.left_hi)?;
+        let left_lo = parse_ramp_corner(&input.left_lo)?;
+        let mut left_hi = parse_ramp_corner(&input.left_hi)?;
         left_hi.x = left_lo.x - left_hi.x;
         left_hi.y = left_lo.y - left_hi.y;
 
-        let right_lo = parse_c_x_y(&input.right_lo)?;
-        let mut right_hi = parse_c_x_y(&input.right_hi)?;
+        let right_lo = parse_ramp_corner(&input.right_lo)?;
+        let mut right_hi = parse_ramp_corner(&input.right_hi)?;
         right_hi.x = right_lo.x - right_hi.x;
         right_hi.y = right_lo.y - right_hi.y;
         let res = Self {
@@ -129,19 +129,39 @@ impl TryFrom<s2protocol::cache_handles::t3_terrain::Ramp> for RampResource {
     }
 }
 
+///
+#[derive(Resource, Default, Reflect, Debug)]
+#[reflect(Resource, Default)]
+pub struct RampCorner {
+    /// The center of the ramp (TODO: verify)
+    center: Vec2,
+    /// The unit vector pointing up the ramp.
+    up: Vec2,
+    /// The width of the ramp (TODO: verify)
+    width: f32,
+    /// The height of the ramp (TODO: verify)
+    height: f32,
+    /// The unit vector pointing right dir of the ramp?
+    right: Vec2,
+}
+
 /// The Ramp contains x,y inside c=(x,y)
 /// u(0.000000e+00, -1.000000e+00) r(-1.000000e+00, 0.000000e+00) c=(4.800000e+01, 2.600000e+01) w=2.000000e+00 h=2.000000e+00
 /// There are maybe 10 maybe 100 ramps per maps and it's only read once, maybe String is fine by now.
-fn parse_c_x_y(s: &str) -> Result<Vec2, BevySC2MapError> {
-    let (tail, _) = take_until("c=(")(s)?;
+fn parse_ramp_corner(s: &str) -> Result<RampCorner, BevySC2MapError> {
+    let (tail, _) = tag("u(")(s)?;
+    let (tail, ux) = take_until(", ")(tail)?;
+    let (tail, _) = take_until("c=(")(tail)?;
     let (tail, _) = tag("c=(")(tail)?;
-    let (tail, x) = take_until(", ")(tail)?;
+    let (tail, cx) = take_until(", ")(tail)?;
     let (tail, _) = tag(", ")(tail)?;
-    let (_, y) = take_until(") ")(tail)?;
-    Ok(c_x_y_to_vec2(x, y)?)
+    let (_, cy) = take_until(") ")(tail)?;
+    Ok(RampCorner {
+        c: x_y_to_vec2(cx, cy)?,
+    })
 }
 
-fn c_x_y_to_vec2(x_str: &str, y_str: &str) -> Result<Vec2, BevySC2MapError> {
+fn x_y_to_vec2(x_str: &str, y_str: &str) -> Result<Vec2, BevySC2MapError> {
     Ok(Vec2::new(x_str.parse()?, y_str.parse()?))
 }
 
